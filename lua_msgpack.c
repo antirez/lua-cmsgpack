@@ -229,7 +229,7 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
             b[4] = n & 0xff;
             enclen = 5;
         } else {
-            b[0] = 0xd3;        /* int 32 */
+            b[0] = 0xd3;        /* int 64 */
             b[1] = (n & 0xff00000000000000) >> 56;
             b[2] = (n & 0xff000000000000) >> 48;
             b[3] = (n & 0xff0000000000) >> 40;
