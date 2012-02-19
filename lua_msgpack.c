@@ -85,10 +85,10 @@ void mp_buf_free(mp_buf *buf) {
 
 /* ------------------------------ String cursor ----------------------------------
  * This simple data structure is used for parsing. Basically you create a cursor
- * using a stirng and a length, then it is possible to access the current string
- * position with cursor->p, check the remaining length in cursor->left, and
- * finally consume more string using mp_cur_consume(cursor,len), to advance 'p'
- * and subtract 'left'.
+ * using a string pointer and a length, then it is possible to access the
+ * current string position with cursor->p, check the remaining length
+ * in cursor->left, and finally consume more string using
+ * mp_cur_consume(cursor,len), to advance 'p' and subtract 'left'.
  * An additional field cursor->error is set to zero on initialization and can
  * be used to report errors. */
 
