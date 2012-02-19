@@ -7,6 +7,10 @@
 #include "lua.h"
 #include "lauxlib.h"
 
+#define LUAMSGPACK_VERSION     "lua-msgpack 0.1.0"
+#define LUAMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
+#define LUAMSGPACK_DESCRIPTION "MessagePack implementation for Lua"
+
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
@@ -646,14 +650,21 @@ static int mp_unpack(lua_State *L) {
 /* ---------------------------------------------------------------------------- */
 
 static const struct luaL_reg thislib[] = {
-  {"pack", mp_pack},
-  {"unpack", mp_unpack},
-  {NULL, NULL}
+    {"pack", mp_pack},
+    {"unpack", mp_unpack},
+    {NULL, NULL}
 };
 
 LUALIB_API int luaopen_msgpack (lua_State *L) {
-  luaL_register(L, "msgpack", thislib);
-  return 1;
+    luaL_register(L, "msgpack", thislib);
+
+    lua_pushliteral(L, LUAMSGPACK_VERSION);
+    lua_setfield(L, -2, "_VERSION");
+    lua_pushliteral(L, LUAMSGPACK_COPYRIGHT);
+    lua_setfield(L, -2, "_COPYRIGHT");
+    lua_pushliteral(L, LUAMSGPACK_DESCRIPTION);
+    lua_setfield(L, -2, "_DESCRIPTION"); 
+    return 1;
 }
 
 /******************************************************************************
