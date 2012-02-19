@@ -11,7 +11,7 @@
  * MessagePack implementation and bindings for Lua 5.1.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
  *
- * http://github.com/antirez/luamsgpack
+ * http://github.com/antirez/lua-msgpack
  *
  * For MessagePack specification check the following web site:
  * http://wiki.msgpack.org/display/MSGPACK/Format+specification
