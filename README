@@ -1,0 +1,40 @@
+README for lua_msgpack.c
+===
+
+Lua msgpack is a MessagePack (http://msgpack.org) implementation and bindings for
+Lua 5.1 in a self contained C file without external dependencies.
+
+This library is open source software licensed under the BSD two-clause license.
+The library is currently considered in BETA STAGE for lack of extensive testing.
+
+INSTALLATION
+---
+
+To include this library in your Lua project, just add the lua_msgpack.c file
+and call the following function after creating the Lua interpreter:
+
+    luaopen_msgpack(L);
+
+USAGE
+---
+
+The exported API is very simple, consisting in two functions:
+
+* msgpack = msgpack.pack(lua_object)
+* lua_object = msgpack.unpack(msgpack)
+
+However because of the nature of Lua numerical and table type a few behavior
+of the library must be well understood to avoid problems:
+
+* A table is converted into a MessagePack map type if the Lua # (count operator) returns zero, like in the case of {foo=5,bar="hello"}.
+* A table is converted into a MessagePack array type if the Lua # (count operator) returns non zero, like in the case of {0,1,2,3,"foo","bar"}. In this case only the elements from index 1 up to the index returned by the count operator are serialized.
+* A Lua number is converted into an integer type if floor(number) == number, otherwise it is converted into the MessagePack float or double value.
+* When a Lua number is converted to float or double, the former is preferred if there is no loss of precision compared to the double representation.
+* When a MessagePack big integer (64 bit) is converted to a Lua number it is possible that the resulting number will not represent the original number but just an approximation. This is unavoidable because the Lua numerical type is usually a double precision floating point type.
+
+CREDITS
+---
+
+This library was written by Salvatore Sanfilippo for Redis, but is maintained as a separated project by the author.
+
+Some of the test vectors in "test.lua" are obtained from the Javascript MessagePack-JS library (https://github.com/cuzic/MessagePack-JS).
