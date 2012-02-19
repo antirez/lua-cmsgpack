@@ -56,7 +56,7 @@ end
 
 function test_circular(name,obj)
     io.write("Circular test '",name,"' ...")
-    if obj ~= msgpack.unpack(msgpack.pack(obj)) then
+    if not compare_objects(obj,msgpack.unpack(msgpack.pack(obj))) then
         print("ERROR:", obj, msgpack.unpack(msgpack.pack(obj)))
         failed = failed+1
     else
@@ -115,6 +115,10 @@ test_circular("int32 min",-2147483648);
 test_circular("nil",nil);
 test_circular("fix string","abc");
 test_circular("string16","xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab");
+test_circular("fix array (1)",{1,2,3,"foo"})
+test_circular("fix array (2)",{})
+test_circular("fix array (3)",{1,{},{}})
+test_circular("fix map",{a=5,b=10,c="string"})
 
 -- The following test vectors are taken from the Javascript lib at:
 -- https://github.com/cuzic/MessagePack-JS/blob/master/test/test_pack.html
