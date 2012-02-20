@@ -10,7 +10,22 @@ The library is currently considered in BETA STAGE for lack of extensive testing.
 INSTALLATION
 ---
 
-To include this library in your Lua project, just add the lua_msgpack.c file
+Using LuaRocks (http://luarocks.org):
+
+* Install current stable release:
+
+    sudo luarocks install lua-msgpack
+
+* Install current Git master head from GitHub:
+
+    sudo luarocks install lua-msgpack --from=rocks-cvs
+
+* Install from current working copy
+
+    cd lua-msgpack/
+    sudo luarocks make rockspec/lua-msgpack-scm-1.rockspec
+
+If you embed Lua and all modules into your C project, just add the lua_msgpack.c file
 and call the following function after creating the Lua interpreter:
 
     luaopen_msgpack(L);
