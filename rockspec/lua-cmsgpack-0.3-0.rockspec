@@ -16,7 +16,7 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      msgpack = {
+      cmsgpack = {
          sources = {
             "lua_cmsgpack.c",
          }

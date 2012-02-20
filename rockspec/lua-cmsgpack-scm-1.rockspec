@@ -6,7 +6,7 @@ source = {
 }
 description = {
    summary = "MessagePack C implementation and bindings for Lua 5.1",
-   homepage = "http://github.com/antirez/lua-msgpack",
+   homepage = "http://github.com/antirez/lua-cmsgpack",
    license = "Two-clause BSD",
    maintainer = "Salvatore Sanfilippo <antirez@gmail.com>"
 }
@@ -16,7 +16,7 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      msgpack = {
+      cmsgpack = {
          sources = {
             "lua_cmsgpack.c",
          }
