@@ -205,10 +205,10 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
             enclen = 5;
         } else {
             b[0] = 0xcf;        /* uint 64 */
-            b[1] = (n & 0xff00000000000000) >> 56;
-            b[2] = (n & 0xff000000000000) >> 48;
-            b[3] = (n & 0xff0000000000) >> 40;
-            b[4] = (n & 0xff00000000) >> 32;
+            b[1] = (n & 0xff00000000000000LL) >> 56;
+            b[2] = (n & 0xff000000000000LL) >> 48;
+            b[3] = (n & 0xff0000000000LL) >> 40;
+            b[4] = (n & 0xff00000000LL) >> 32;
             b[5] = (n & 0xff000000) >> 24;
             b[6] = (n & 0xff0000) >> 16;
             b[7] = (n & 0xff00) >> 8;
@@ -228,7 +228,7 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
             b[1] = (n & 0xff00) >> 8;
             b[2] = n & 0xff;
             enclen = 3;
-        } else if (n >= -2147483648) {
+        } else if (n >= -2147483648LL) {
             b[0] = 0xd2;        /* int 32 */
             b[1] = (n & 0xff000000) >> 24;
             b[2] = (n & 0xff0000) >> 16;
@@ -237,10 +237,10 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
             enclen = 5;
         } else {
             b[0] = 0xd3;        /* int 64 */
-            b[1] = (n & 0xff00000000000000) >> 56;
-            b[2] = (n & 0xff000000000000) >> 48;
-            b[3] = (n & 0xff0000000000) >> 40;
-            b[4] = (n & 0xff00000000) >> 32;
+            b[1] = (n & 0xff00000000000000LL) >> 56;
+            b[2] = (n & 0xff000000000000LL) >> 48;
+            b[3] = (n & 0xff0000000000LL) >> 40;
+            b[4] = (n & 0xff00000000LL) >> 32;
             b[5] = (n & 0xff000000) >> 24;
             b[6] = (n & 0xff0000) >> 16;
             b[7] = (n & 0xff00) >> 8;
@@ -365,7 +365,7 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx;
+    long count = 0, max = 0, idx = 0;
     lua_Number n;
 
     lua_pushnil(L);
