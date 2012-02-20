@@ -7,17 +7,17 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#define LUAMSGPACK_VERSION     "lua-msgpack 0.2.1"
-#define LUAMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
-#define LUAMSGPACK_DESCRIPTION "MessagePack implementation for Lua"
+#define LUACMSGPACK_VERSION     "lua-msgpack 0.3.0"
+#define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
+#define LUACMSGPACK_DESCRIPTION "MessagePack implementation for Lua"
 
-#define LUAMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
+#define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
 
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
  *
- * http://github.com/antirez/lua-msgpack
+ * http://github.com/antirez/lua-cmsgpack
  *
  * For MessagePack specification check the following web site:
  * http://wiki.msgpack.org/display/MSGPACK/Format+specification
@@ -28,6 +28,7 @@
  * 19-Feb-2012 (ver 0.1.0): Initial release.
  * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
  * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
+ * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
@@ -414,7 +415,7 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
 
     /* Limit the encoding of nested tables to a specfiied maximum depth, so that
      * we survive when called against circular references in tables. */
-    if (t == LUA_TTABLE && level == LUAMSGPACK_MAX_NESTING) t = LUA_TNIL;
+    if (t == LUA_TTABLE && level == LUACMSGPACK_MAX_NESTING) t = LUA_TNIL;
     switch(t) {
     case LUA_TSTRING: mp_encode_lua_string(L,buf); break;
     case LUA_TBOOLEAN: mp_encode_lua_bool(L,buf); break;
@@ -692,14 +693,14 @@ static const struct luaL_reg thislib[] = {
     {NULL, NULL}
 };
 
-LUALIB_API int luaopen_msgpack (lua_State *L) {
-    luaL_register(L, "msgpack", thislib);
+LUALIB_API int luaopen_cmsgpack (lua_State *L) {
+    luaL_register(L, "cmsgpack", thislib);
 
-    lua_pushliteral(L, LUAMSGPACK_VERSION);
+    lua_pushliteral(L, LUACMSGPACK_VERSION);
     lua_setfield(L, -2, "_VERSION");
-    lua_pushliteral(L, LUAMSGPACK_COPYRIGHT);
+    lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
     lua_setfield(L, -2, "_COPYRIGHT");
-    lua_pushliteral(L, LUAMSGPACK_DESCRIPTION);
+    lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
     lua_setfield(L, -2, "_DESCRIPTION"); 
     return 1;
 }

@@ -1,6 +1,6 @@
--- lua_msgpack.c lib tests
+-- lua_cmsgpack.c lib tests
 -- Copyright(C) 2012 Salvatore Sanfilippo, All Rights Reserved.
--- See the copyright notice at the end of lua_msgpack.c for more information.
+-- See the copyright notice at the end of lua_cmsgpack.c for more information.
 
 passed = 0
 failed = 0 
@@ -56,8 +56,8 @@ end
 
 function test_circular(name,obj)
     io.write("Circular test '",name,"' ...")
-    if not compare_objects(obj,msgpack.unpack(msgpack.pack(obj))) then
-        print("ERROR:", obj, msgpack.unpack(msgpack.pack(obj)))
+    if not compare_objects(obj,cmsgpack.unpack(cmsgpack.pack(obj))) then
+        print("ERROR:", obj, cmsgpack.unpack(cmsgpack.pack(obj)))
         failed = failed+1
     else
         print("ok")
@@ -67,8 +67,8 @@ end
 
 function test_pack(name,obj,raw)
     io.write("Testing encoder '",name,"' ...")
-    if hex(msgpack.pack(obj)) ~= raw then
-        print("ERROR:", obj, hex(msgpack.pack(obj)), raw)
+    if hex(cmsgpack.pack(obj)) ~= raw then
+        print("ERROR:", obj, hex(cmsgpack.pack(obj)), raw)
         failed = failed+1
     else
         print("ok")
@@ -78,9 +78,8 @@ end
 
 function test_unpack(name,raw,obj)
     io.write("Testing decoder '",name,"' ...")
-    if not compare_objects(msgpack.unpack(unhex(raw)),obj) then
-    --if msgpack.unpack(unhex(raw)) ~= obj then
-        print("ERROR:", obj, raw, msgpack.unpack(unhex(raw)))
+    if not compare_objects(cmsgpack.unpack(unhex(raw)),obj) then
+        print("ERROR:", obj, raw, cmsgpack.unpack(unhex(raw)))
         failed = failed+1
     else
         print("ok")
@@ -146,7 +145,7 @@ test_pack_and_unpack("array 16",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},"dc00100000000
 a = {x=nil,y=5}
 b = {x=a}
 a['x'] = b
-pack = msgpack.pack(a)
+pack = cmsgpack.pack(a)
 test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
 
 -- Final report

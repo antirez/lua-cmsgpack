@@ -1,4 +1,4 @@
-README for lua_msgpack.c
+README for lua_cmsgpack.c
 ===
 
 Lua msgpack is a MessagePack (http://msgpack.org) implementation and bindings for
@@ -14,29 +14,30 @@ Using LuaRocks (http://luarocks.org):
 
 * Install current stable release:
 
-    sudo luarocks install lua-msgpack
+    sudo luarocks install lua-cmsgpack
 
 * Install current Git master head from GitHub:
 
-    sudo luarocks install lua-msgpack --from=rocks-cvs
+    sudo luarocks install lua-cmsgpack --from=rocks-cvs
 
 * Install from current working copy
 
-    cd lua-msgpack/
-    sudo luarocks make rockspec/lua-msgpack-scm-1.rockspec
+    cd lua-cmsgpack/
+    sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec
 
-If you embed Lua and all modules into your C project, just add the lua_msgpack.c file
-and call the following function after creating the Lua interpreter:
+If you embed Lua and all modules into your C project, just add the
+lua_cmsgpack.c file and call the following function after creating the Lua
+interpreter:
 
-    luaopen_msgpack(L);
+    luaopen_cmsgpack(L);
 
 USAGE
 ---
 
 The exported API is very simple, consisting in two functions:
 
-* msgpack = msgpack.pack(lua_object)
-* lua_object = msgpack.unpack(msgpack)
+* msgpack = cmsgpack.pack(lua_object)
+* lua_object = cmsgpack.unpack(msgpack)
 
 However because of the nature of Lua numerical and table type a few behavior
 of the library must be well understood to avoid problems:
@@ -52,7 +53,7 @@ maps.
 
 NESTED TABLES
 ---
-Nested tables are handled correctly up to LUAMSGPACK_MAX_NESTING levels of
+Nested tables are handled correctly up to LUACMSGPACK_MAX_NESTING levels of
 nesting (that is set to 16 by default).
 Every table that is nested at a greater level than the maxium is encoded
 as MessagePack nil value.

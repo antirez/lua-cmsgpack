@@ -1,11 +1,11 @@
-package = "lua-msgpack"
-version = "0.1-1"
+package = "lua-cmsgpack"
+version = "scm-1"
 source = {
-   url = "git://github.com/antirez/lua-msgpack.git",
-   branch = "0.1"
+   url = "git://github.com/antirez/lua-cmsgpack.git",
+   branch = "master"
 }
 description = {
-   summary = "MessagePack implementation and bindings for Lua 5.1",
+   summary = "MessagePack C implementation and bindings for Lua 5.1",
    homepage = "http://github.com/antirez/lua-msgpack",
    license = "MIT/X11",
    maintainer = "Salvatore Sanfilippo <antirez@gmail.com>"
@@ -18,7 +18,7 @@ build = {
    modules = {
       msgpack = {
          sources = {
-            "lua_msgpack.c",
+            "lua_cmsgpack.c",
          }
       }
    }
