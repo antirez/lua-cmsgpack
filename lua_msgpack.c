@@ -360,11 +360,41 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
     }
 }
 
+/* Returns true if the Lua table on top of the stack is exclusively composed
+ * of keys from numerical keys from 1 up to N, with N being the total number
+ * of elements, without any hole in the middle. */
+static int table_is_an_array(lua_State *L) {
+    long count = 0, max = 0, idx;
+    lua_Number n;
+
+    lua_pushnil(L);
+    while(lua_next(L,-2)) {
+        /* Stack: ... key value */
+        lua_pop(L,1); /* Stack: ... key */
+        if (!lua_isnumber(L,-1)) goto not_array;
+        n = lua_tonumber(L,-1);
+        idx = n;
+        if (idx != n || idx < 1) goto not_array;
+        count++;
+        max = idx;
+    }
+    /* We have the total number of elements in "count". Also we have
+     * the max index encountered in "idx". We can't reach this code
+     * if there are indexes <= 0. If you also note that there can not be
+     * repeated keys into a table, you have that if idx==count you are sure
+     * that there are all the keys form 1 to count (both included). */
+    return idx == count;
+
+not_array:
+    lua_pop(L,1);
+    return 0;
+}
+
 /* If the length operator returns non-zero, that is, there is at least
  * an object at key '1', we serialize to message pack list. Otherwise
  * we use a map. */
 static void mp_encode_lua_table(lua_State *L, mp_buf *buf, int level) {
-    if (lua_objlen(L,-1))
+    if (table_is_an_array(L))
         mp_encode_lua_table_as_array(L,buf,level);
     else
         mp_encode_lua_table_as_map(L,buf,level);
