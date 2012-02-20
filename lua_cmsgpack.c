@@ -7,9 +7,9 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#define LUACMSGPACK_VERSION     "lua-msgpack 0.3.0"
+#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.0"
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
-#define LUACMSGPACK_DESCRIPTION "MessagePack implementation for Lua"
+#define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
 #define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
 
