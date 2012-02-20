@@ -7,7 +7,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#define LUAMSGPACK_VERSION     "lua-msgpack 0.2.0"
+#define LUAMSGPACK_VERSION     "lua-msgpack 0.2.1"
 #define LUAMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUAMSGPACK_DESCRIPTION "MessagePack implementation for Lua"
 
@@ -27,6 +27,7 @@
  * CHANGELOG:
  * 19-Feb-2012 (ver 0.1.0): Initial release.
  * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
+ * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
