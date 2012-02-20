@@ -11,6 +11,8 @@
 #define LUAMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUAMSGPACK_DESCRIPTION "MessagePack implementation for Lua"
 
+#define LUAMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
+
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
@@ -319,22 +321,22 @@ static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     }
 }
 
-static void mp_encode_lua_type(lua_State *L, mp_buf *buf);
+static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
 
 /* Convert a lua table into a message pack list. */
-static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
     size_t len = lua_objlen(L,-1), j;
 
     mp_encode_array(buf,len);
     for (j = 1; j <= len; j++) {
         lua_pushnumber(L,j);
         lua_gettable(L,-2);
-        mp_encode_lua_type(L,buf);
+        mp_encode_lua_type(L,buf,level+1);
     }
 }
 
 /* Convert a lua table into a message pack key-value map. */
-static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
     size_t len = 0;
 
     /* First step: count keys into table. No other way to do it with the
@@ -353,19 +355,19 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf) {
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
         lua_pushvalue(L,-2); /* Stack: ... key value key */
-        mp_encode_lua_type(L,buf); /* encode key */
-        mp_encode_lua_type(L,buf); /* encode val */
+        mp_encode_lua_type(L,buf,level+1); /* encode key */
+        mp_encode_lua_type(L,buf,level+1); /* encode val */
     }
 }
 
 /* If the length operator returns non-zero, that is, there is at least
  * an object at key '1', we serialize to message pack list. Otherwise
  * we use a map. */
-static void mp_encode_lua_table(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_table(lua_State *L, mp_buf *buf, int level) {
     if (lua_objlen(L,-1))
-        mp_encode_lua_table_as_array(L,buf);
+        mp_encode_lua_table_as_array(L,buf,level);
     else
-        mp_encode_lua_table_as_map(L,buf);
+        mp_encode_lua_table_as_map(L,buf,level);
 }
 
 static void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
@@ -375,14 +377,17 @@ static void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
     mp_buf_append(buf,b,1);
 }
 
-static void mp_encode_lua_type(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     int t = lua_type(L,-1);
 
+    /* Limit the encoding of nested tables to a specfiied maximum depth, so that
+     * we survive when called against circular references in tables. */
+    if (t == LUA_TTABLE && level == LUAMSGPACK_MAX_NESTING) t = LUA_TNIL;
     switch(t) {
     case LUA_TSTRING: mp_encode_lua_string(L,buf); break;
     case LUA_TBOOLEAN: mp_encode_lua_bool(L,buf); break;
     case LUA_TNUMBER: mp_encode_lua_number(L,buf); break;
-    case LUA_TTABLE: mp_encode_lua_table(L,buf); break;
+    case LUA_TTABLE: mp_encode_lua_table(L,buf,level); break;
     default: mp_encode_lua_null(L,buf); break;
     }
     lua_pop(L,1);
@@ -391,7 +396,7 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf) {
 static int mp_pack(lua_State *L) {
     mp_buf *buf = mp_buf_new();
 
-    mp_encode_lua_type(L,buf);
+    mp_encode_lua_type(L,buf,0);
     lua_pushlstring(L,(char*)buf->b,buf->len);
     mp_buf_free(buf);
     return 1;

@@ -142,6 +142,13 @@ test_pack_and_unpack("int64",-1099511627776,"d3ffffff0000000000")
 test_pack_and_unpack("raw16","                                        ","da002820202020202020202020202020202020202020202020202020202020202020202020202020202020")
 test_pack_and_unpack("array 16",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},"dc001000000000000000000000000000000000")
 
+-- Regression test for issue #4, cyclic references in tables.
+a = {x=nil,y=5}
+b = {x=a}
+a['x'] = b
+pack = msgpack.pack(a)
+test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
+
 -- Final report
 print()
 print("TEST PASSED:",passed)

@@ -32,6 +32,23 @@ of the library must be well understood to avoid problems:
 * When a Lua number is converted to float or double, the former is preferred if there is no loss of precision compared to the double representation.
 * When a MessagePack big integer (64 bit) is converted to a Lua number it is possible that the resulting number will not represent the original number but just an approximation. This is unavoidable because the Lua numerical type is usually a double precision floating point type.
 
+NESTED TABLES
+---
+Nested tables are handled correctly up to LUAMSGPACK_MAX_NESTING levels of
+nesting (that is set to 16 by default).
+Every table that is nested at a greater level than the maxium is encoded
+as MessagePack nil value.
+
+It is worth to note that in Lua it is possible to create tables that mutually
+refer to each other, creating a cycle. For example:
+
+a = {x=nil,y=5}
+b = {x=a}
+a['x'] = b
+
+This condition will simply make the encoder reach the max level of nesting,
+thus avoiding an infinite loop.
+
 CREDITS
 ---
 
