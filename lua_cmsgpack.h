@@ -20,6 +20,19 @@
 #endif
 
 
+/*
+ * Allows compilation under Lua 5.1 and 5.2 and avoids use of functions which have been deprecated in 5.2.
+ */
+#if LUA_VERSION_NUM >= 502 /* Assumes Lua 5.2 or hopes for compatibility */
+#	define LUACOMPAT_REGISTER(L,l) luaL_setfuncs(L,l,0)
+#	define lua_objlen(L, i) lua_rawlen(L, i)
+#	define LUACOMPAT_PUSH_GLOBAL_ENVIRONMENT(L) lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS)
+#else /* Assumes Lua 5.1 or hopes for compatibility */
+#	define LUACOMPAT_REGISTER(L,l) luaL_register(L,NULL,l)
+#	define LUACOMPAT_PUSH_GLOBAL_ENVIRONMENT(L) lua_pushvalue(L, LUA_GLOBALSINDEX)
+#endif
+
+
 #if _XOPEN_SOURCE >= 600 || _ISOC99_SOURCE || _POSIX_C_SOURCE >= 200112L
 #	define IS_FINITE(x) isfinite(x)
 #else

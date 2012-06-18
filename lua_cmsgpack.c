@@ -685,21 +685,34 @@ static int mp_unpack(lua_State *L) {
 
 /* ---------------------------------------------------------------------------- */
 
-static const struct luaL_reg thislib[] = {
+static const struct luaL_Reg thislib[] = {
     {"pack", mp_pack},
     {"unpack", mp_unpack},
     {NULL, NULL}
 };
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
-    luaL_register(L, "cmsgpack", thislib);
+    int module_table_index;
 
-    lua_pushliteral(L, LUACMSGPACK_VERSION);
-    lua_setfield(L, -2, "_VERSION");
-    lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
-    lua_setfield(L, -2, "_COPYRIGHT");
-    lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
-    lua_setfield(L, -2, "_DESCRIPTION"); 
+    lua_newtable(L);
+    module_table_index = lua_gettop(L);
+    {
+        LUACOMPAT_REGISTER(L, thislib);
+    
+        lua_pushliteral(L, LUACMSGPACK_VERSION);
+        lua_setfield(L, -2, "_VERSION");
+        lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
+        lua_setfield(L, -2, "_COPYRIGHT");
+        lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
+        lua_setfield(L, -2, "_DESCRIPTION"); 
+    }
+
+    LUACOMPAT_PUSH_GLOBAL_ENVIRONMENT(L);
+    lua_pushliteral(L, "cmsgpack");
+    lua_pushvalue(L, module_table_index);
+    lua_settable(L, -3);
+
+    lua_settop(L, module_table_index);
     return 1;
 }
 
