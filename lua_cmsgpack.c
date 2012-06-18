@@ -367,30 +367,40 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx = 0;
-    lua_Number n;
+    long count;
+    /*
+     * Lua table keys for the array part are always ints, no need for longs.
+     * Stores the maximum positive integral index so far.
+     */
+    int max;
 
+    /* Stack top on function entry */
+    int stacktop;
+
+    stacktop = lua_gettop(L);
+
+    count = 0;
+    max = 0;
     lua_pushnil(L);
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
-        lua_pop(L,1); /* Stack: ... key */
-        if (!lua_isnumber(L,-1)) goto not_array;
-        n = lua_tonumber(L,-1);
-        idx = n;
-        if (idx != n || idx < 1) goto not_array;
+	lua_Number n;
         count++;
-        max = idx;
+        lua_pop(L,1); /* Stack: ... key */
+        if ( !lua_isnumber(L,-1) ||
+	     (n = lua_tonumber(L, -1)) <= 0 ) {
+		lua_settop(L, stacktop);
+		return 0;
+	}
+        max = (n > max ? n : max);
     }
     /* We have the total number of elements in "count". Also we have
-     * the max index encountered in "idx". We can't reach this code
+     * the max index encountered in "max". We can't reach this code
      * if there are indexes <= 0. If you also note that there can not be
      * repeated keys into a table, you have that if idx==count you are sure
      * that there are all the keys form 1 to count (both included). */
-    return idx == count;
-
-not_array:
-    lua_pop(L,1);
-    return 0;
+    lua_settop(L, stacktop);
+    return max == count;
 }
 
 /* If the length operator returns non-zero, that is, there is at least
