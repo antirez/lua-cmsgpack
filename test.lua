@@ -2,6 +2,8 @@
 -- Copyright(C) 2012 Salvatore Sanfilippo, All Rights Reserved.
 -- See the copyright notice at the end of lua_cmsgpack.c for more information.
 
+local cmsgpack = require 'cmsgpack'
+
 passed = 0
 failed = 0 
 
