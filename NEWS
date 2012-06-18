@@ -1,0 +1,4 @@
+20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
+20-Feb-2012 (ver 0.2.1): Minor bug fixing.
+20-Feb-2012 (ver 0.2.0): Tables encoding improved.
+19-Feb-2012 (ver 0.1.0): Initial release.

@@ -10,12 +10,6 @@
  * http://wiki.msgpack.org/display/MSGPACK/Format+specification
  *
  * See Copyright Notice at the end of this file.
- *
- * CHANGELOG:
- * 19-Feb-2012 (ver 0.1.0): Initial release.
- * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
- * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
- * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
