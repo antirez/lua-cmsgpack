@@ -433,10 +433,13 @@ static int mp_pack(lua_State *L) {
     }
     
     int i;
-    for(i = 0; i < nargs; i++) {
-        mp_buf *buf = mp_buf_new();
+    for(i = 1; i <= nargs; i++) {
+        lua_pushvalue(L, i);
         
+        mp_buf *buf = mp_buf_new();
         mp_encode_lua_type(L,buf,0);
+        
+        lua_settop(L, nargs + i - 1);
         lua_pushlstring(L,(char*)buf->b,buf->len);
         mp_buf_free(buf);
     }
