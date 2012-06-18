@@ -1,17 +1,4 @@
-#include <math.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <assert.h>
-
-#include "lua.h"
-#include "lauxlib.h"
-
-#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.0"
-#define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
-#define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
-
-#define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
+#include "lua_cmsgpack.h"
 
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
@@ -317,10 +304,10 @@ static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
 static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
-    if (floor(n) != n) {
-        mp_encode_double(buf,(double)n);
+	if (IS_INT64_EQUIVALENT(n)) {
+		mp_encode_int(buf,(int64_t)n);
     } else {
-        mp_encode_int(buf,(int64_t)n);
+		mp_encode_double(buf,(double)n);
     }
 }
 
@@ -388,7 +375,8 @@ static int table_is_an_array(lua_State *L) {
         count++;
         lua_pop(L,1); /* Stack: ... key */
         if ( !lua_isnumber(L,-1) ||
-	     (n = lua_tonumber(L, -1)) <= 0 ) {
+	     (n = lua_tonumber(L, -1)) <= 0  ||
+	     !IS_INT_EQUIVALENT(n) ) {
 		lua_settop(L, stacktop);
 		return 0;
 	}
