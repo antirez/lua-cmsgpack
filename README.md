@@ -2,7 +2,7 @@ lua-cmsgpack
 ===
 
 Lua-cmsgpack is a MessagePack (http://msgpack.org) implementation and bindings for
-Lua 5.1 in a self contained C file without external dependencies.
+Lua 5.1 in C without external dependencies.
 
 This library is open source software licensed under the BSD two-clause license.
 The library is currently considered in BETA STAGE for lack of extensive testing.
