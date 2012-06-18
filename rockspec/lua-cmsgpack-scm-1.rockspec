@@ -18,7 +18,7 @@ build = {
    modules = {
       cmsgpack = {
          sources = {
-            "lua_cmsgpack.c",
+            "lua_cmsgpack.c"
          }
       }
    }

@@ -13,6 +13,23 @@
 
 #define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
 
+/* Allows a preprocessor directive to override MAX_NESTING */
+#ifndef LUACMSGPACK_MAX_NESTING
+    #define LUACMSGPACK_MAX_NESTING  16
+#endif
+
+#if (_XOPEN_SOURCE >= 600 || _ISOC99_SOURCE || _POSIX_C_SOURCE >= 200112L)
+    #define IS_FINITE(x) isfinite(x)
+#else
+    #define IS_FINITE(x) ((x) == (x) && (x) + 1 > (x))
+#endif
+
+/* Check if float or double can be an integer without loss of precision */
+#define IS_INT_TYPE_EQUIVALENT(x, T) (IS_FINITE(x) && (T)(x) == (x))
+
+#define IS_INT64_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int64_t)
+#define IS_INT_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int)
+
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1/5.2.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
@@ -318,10 +335,10 @@ static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
 static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
-    if (floor(n) != n) {
-        mp_encode_double(buf,(double)n);
-    } else {
+    if (IS_INT64_EQUIVALENT(n)) {
         mp_encode_int(buf,(int64_t)n);
+    } else {
+        mp_encode_double(buf,(double)n);
     }
 }
 
@@ -384,7 +401,8 @@ static int table_is_an_array(lua_State *L) {
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
         lua_pop(L,1); /* Stack: ... key */
-        if (!lua_isnumber(L,-1) || (n = lua_tonumber(L, -1)) <= 0) {
+        if (!lua_isnumber(L,-1) || (n = lua_tonumber(L, -1)) <= 0 ||
+            !IS_INT_EQUIVALENT(n)) {
             lua_settop(L, stacktop);
             return 0;
         }
