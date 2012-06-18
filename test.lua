@@ -2,6 +2,8 @@
 -- Copyright(C) 2012 Salvatore Sanfilippo, All Rights Reserved.
 -- See the copyright notice at the end of lua_cmsgpack.c for more information.
 
+local cmsgpack = require 'cmsgpack'
+
 passed = 0
 failed = 0 
 
@@ -118,6 +120,8 @@ test_circular("fix array (1)",{1,2,3,"foo"})
 test_circular("fix array (2)",{})
 test_circular("fix array (3)",{1,{},{}})
 test_circular("fix map",{a=5,b=10,c="string"})
+test_circular("positive infinity", math.huge)
+test_circular("negative infinity", -math.huge)
 
 -- The following test vectors are taken from the Javascript lib at:
 -- https://github.com/cuzic/MessagePack-JS/blob/master/test/test_pack.html

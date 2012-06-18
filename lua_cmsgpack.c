@@ -1,17 +1,4 @@
-#include <math.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <assert.h>
-
-#include "lua.h"
-#include "lauxlib.h"
-
-#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.0"
-#define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
-#define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
-
-#define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
+#include "lua_cmsgpack.h"
 
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
@@ -23,12 +10,6 @@
  * http://wiki.msgpack.org/display/MSGPACK/Format+specification
  *
  * See Copyright Notice at the end of this file.
- *
- * CHANGELOG:
- * 19-Feb-2012 (ver 0.1.0): Initial release.
- * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
- * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
- * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
@@ -41,7 +22,9 @@
  * simplicity of the Lua build system we prefer to check for endianess at runtime.
  * The performance difference should be acceptable. */
 static void memrevifle(void *ptr, size_t len) {
-    unsigned char *p = ptr, *e = p+len-1, aux;
+    unsigned char   *p = (unsigned char *)ptr,
+                    *e = (unsigned char *)p+len-1,
+                    aux;
     int test = 1;
     unsigned char *testp = (unsigned char*) &test;
 
@@ -68,7 +51,7 @@ typedef struct mp_buf {
 } mp_buf;
 
 static mp_buf *mp_buf_new(void) {
-    mp_buf *buf = malloc(sizeof(*buf));
+    mp_buf *buf = (mp_buf*)malloc(sizeof(*buf));
     
     buf->b = NULL;
     buf->len = buf->free = 0;
@@ -79,7 +62,7 @@ void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
     if (buf->free < len) {
         size_t newlen = buf->len+len;
 
-        buf->b = realloc(buf->b,newlen*2);
+        buf->b = (unsigned char*)realloc(buf->b,newlen*2);
         buf->free = newlen;
     }
     memcpy(buf->b+buf->len,s,len);
@@ -112,7 +95,7 @@ typedef struct mp_cur {
 } mp_cur;
 
 static mp_cur *mp_cur_new(const unsigned char *s, size_t len) {
-    mp_cur *cursor = malloc(sizeof(*cursor));
+    mp_cur *cursor = (mp_cur*)malloc(sizeof(*cursor));
 
     cursor->p = s;
     cursor->left = len;
@@ -317,10 +300,10 @@ static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
 static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
-    if (floor(n) != n) {
-        mp_encode_double(buf,(double)n);
+	if (IS_INT64_EQUIVALENT(n)) {
+		mp_encode_int(buf,(int64_t)n);
     } else {
-        mp_encode_int(buf,(int64_t)n);
+		mp_encode_double(buf,(double)n);
     }
 }
 
@@ -367,30 +350,41 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx = 0;
-    lua_Number n;
+    long count;
+    /*
+     * Lua table keys for the array part are always ints, no need for longs.
+     * Stores the maximum positive integral index so far.
+     */
+    int max;
 
+    /* Stack top on function entry */
+    int stacktop;
+
+    stacktop = lua_gettop(L);
+
+    count = 0;
+    max = 0;
     lua_pushnil(L);
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
-        lua_pop(L,1); /* Stack: ... key */
-        if (!lua_isnumber(L,-1)) goto not_array;
-        n = lua_tonumber(L,-1);
-        idx = n;
-        if (idx != n || idx < 1) goto not_array;
+	lua_Number n;
         count++;
-        max = idx;
+        lua_pop(L,1); /* Stack: ... key */
+        if ( !lua_isnumber(L,-1) ||
+	     (n = lua_tonumber(L, -1)) <= 0  ||
+	     !IS_INT_EQUIVALENT(n) ) {
+		lua_settop(L, stacktop);
+		return 0;
+	}
+        max = (n > max ? n : max);
     }
     /* We have the total number of elements in "count". Also we have
-     * the max index encountered in "idx". We can't reach this code
+     * the max index encountered in "max". We can't reach this code
      * if there are indexes <= 0. If you also note that there can not be
      * repeated keys into a table, you have that if idx==count you are sure
      * that there are all the keys form 1 to count (both included). */
-    return idx == count;
-
-not_array:
-    lua_pop(L,1);
-    return 0;
+    lua_settop(L, stacktop);
+    return max == count;
 }
 
 /* If the length operator returns non-zero, that is, there is at least
@@ -405,6 +399,7 @@ static void mp_encode_lua_table(lua_State *L, mp_buf *buf, int level) {
 
 static void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
     unsigned char b[1];
+	(void)L;
 
     b[0] = 0xc0;
     mp_buf_append(buf,b,1);
@@ -426,12 +421,30 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     lua_pop(L,1);
 }
 
+/*
+ * Packs all arguments as a stream.
+ * Returns the empty string if no argument was given.
+ */
 static int mp_pack(lua_State *L) {
-    mp_buf *buf = mp_buf_new();
-
-    mp_encode_lua_type(L,buf,0);
-    lua_pushlstring(L,(char*)buf->b,buf->len);
-    mp_buf_free(buf);
+    int nargs = lua_gettop(L);
+    if(nargs == 0) {
+        lua_pushliteral(L, "");
+        return 1;
+    }
+    
+    int i;
+    for(i = 1; i <= nargs; i++) {
+        lua_pushvalue(L, i);
+        
+        mp_buf *buf = mp_buf_new();
+        mp_encode_lua_type(L,buf,0);
+        
+        lua_settop(L, nargs + i - 1);
+        lua_pushlstring(L,(char*)buf->b,buf->len);
+        mp_buf_free(buf);
+    }
+    
+    lua_concat(L, nargs);
     return 1;
 }
 
@@ -658,6 +671,7 @@ static int mp_unpack(lua_State *L) {
     size_t len;
     const unsigned char *s;
     mp_cur *c;
+	int cnt;/* Number of objects unpacked */
 
     if (!lua_isstring(L,-1)) {
         lua_pushstring(L,"MessagePack decoding needs a string as input.");
@@ -666,42 +680,55 @@ static int mp_unpack(lua_State *L) {
 
     s = (const unsigned char*) lua_tolstring(L,-1,&len);
     c = mp_cur_new(s,len);
-    mp_decode_to_lua_type(L,c);
-    
-    if (c->err == MP_CUR_ERROR_EOF) {
-        mp_cur_free(c);
-        lua_pushstring(L,"Missing bytes in input.");
-        lua_error(L);
-    } else if (c->err == MP_CUR_ERROR_BADFMT) {
-        mp_cur_free(c);
-        lua_pushstring(L,"Bad data format in input.");
-        lua_error(L);
-    } else if (c->left != 0) {
-        mp_cur_free(c);
-        lua_pushstring(L,"Extra bytes in input.");
-        lua_error(L);
-    }
+	
+	for(cnt = 0; c->left > 0; cnt++) {
+		mp_decode_to_lua_type(L,c);
+		
+		if (c->err == MP_CUR_ERROR_EOF) {
+			mp_cur_free(c);
+			lua_pushstring(L,"Missing bytes in input.");
+			lua_error(L);
+		} else if (c->err == MP_CUR_ERROR_BADFMT) {
+			mp_cur_free(c);
+			lua_pushstring(L,"Bad data format in input.");
+			lua_error(L);
+		}
+	}
+	
     mp_cur_free(c);
-    return 1;
+    return cnt;
 }
 
 /* ---------------------------------------------------------------------------- */
 
-static const struct luaL_reg thislib[] = {
+static const struct luaL_Reg thislib[] = {
     {"pack", mp_pack},
     {"unpack", mp_unpack},
     {NULL, NULL}
 };
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
-    luaL_register(L, "cmsgpack", thislib);
+    int module_table_index;
 
-    lua_pushliteral(L, LUACMSGPACK_VERSION);
-    lua_setfield(L, -2, "_VERSION");
-    lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
-    lua_setfield(L, -2, "_COPYRIGHT");
-    lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
-    lua_setfield(L, -2, "_DESCRIPTION"); 
+    lua_newtable(L);
+    module_table_index = lua_gettop(L);
+    {
+        LUACOMPAT_REGISTER(L, thislib);
+    
+        lua_pushliteral(L, LUACMSGPACK_VERSION);
+        lua_setfield(L, -2, "_VERSION");
+        lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
+        lua_setfield(L, -2, "_COPYRIGHT");
+        lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
+        lua_setfield(L, -2, "_DESCRIPTION"); 
+    }
+
+    LUACOMPAT_PUSH_GLOBAL_ENVIRONMENT(L);
+    lua_pushliteral(L, "cmsgpack");
+    lua_pushvalue(L, module_table_index);
+    lua_settable(L, -3);
+
+    lua_settop(L, module_table_index);
     return 1;
 }
 
