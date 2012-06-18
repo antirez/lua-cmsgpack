@@ -67,10 +67,3 @@ a['x'] = b
 
 This condition will simply make the encoder reach the max level of nesting,
 thus avoiding an infinite loop.
-
-CREDITS
----
-
-This library was written by Salvatore Sanfilippo for Redis, but is maintained as a separated project by the author.
-
-Some of the test vectors in "test.lua" are obtained from the Javascript MessagePack-JS library (https://github.com/cuzic/MessagePack-JS).
