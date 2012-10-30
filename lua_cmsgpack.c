@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
@@ -67,19 +66,23 @@ typedef struct mp_buf {
     size_t len, free;
 } mp_buf;
 
-static mp_buf *mp_buf_new(void) {
-    mp_buf *buf = malloc(sizeof(*buf));
-    
+static mp_buf *mp_buf_new(lua_State *L) {
+    void* ud;
+    lua_Alloc alloc = lua_getallocf(L, &ud);
+    mp_buf *buf = alloc(ud, NULL, 0, sizeof(*buf));
+
     buf->b = NULL;
     buf->len = buf->free = 0;
     return buf;
 }
 
-void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
+void mp_buf_append(lua_State *L, mp_buf *buf, const unsigned char *s, size_t len) {
     if (buf->free < len) {
+        void* ud;
+        lua_Alloc alloc = lua_getallocf(L, &ud);
         size_t newlen = buf->len+len;
 
-        buf->b = realloc(buf->b,newlen*2);
+        buf->b = alloc(ud, buf->b, buf->len, newlen*2);
         buf->free = newlen;
     }
     memcpy(buf->b+buf->len,s,len);
@@ -87,9 +90,11 @@ void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
     buf->free -= len;
 }
 
-void mp_buf_free(mp_buf *buf) {
-    free(buf->b);
-    free(buf);
+void mp_buf_free(lua_State *L, mp_buf *buf) {
+    void* ud;
+    lua_Alloc alloc = lua_getallocf(L, &ud);
+    (void)alloc(ud, buf->b, buf->len, 0);
+    (void)alloc(ud, buf, sizeof(*buf), 0);
 }
 
 /* ------------------------------ String cursor ----------------------------------
@@ -111,8 +116,10 @@ typedef struct mp_cur {
     int err;
 } mp_cur;
 
-static mp_cur *mp_cur_new(const unsigned char *s, size_t len) {
-    mp_cur *cursor = malloc(sizeof(*cursor));
+static mp_cur *mp_cur_new(lua_State *L, const unsigned char *s, size_t len) {
+    void* ud;
+    lua_Alloc alloc = lua_getallocf(L, &ud);
+    mp_cur *cursor = alloc(ud, NULL, 0, sizeof(*cursor));
 
     cursor->p = s;
     cursor->left = len;
@@ -120,8 +127,10 @@ static mp_cur *mp_cur_new(const unsigned char *s, size_t len) {
     return cursor;
 }
 
-static void mp_cur_free(mp_cur *cursor) {
-    free(cursor);
+static void mp_cur_free(lua_State *L, mp_cur *cursor) {
+    void* ud;
+    lua_Alloc alloc = lua_getallocf(L, &ud);
+    (void)alloc(ud, cursor, sizeof(*cursor), 0);
 }
 
 #define mp_cur_consume(_c,_len) do { _c->p += _len; _c->left -= _len; } while(0)
@@ -138,7 +147,7 @@ static void mp_cur_free(mp_cur *cursor) {
 
 /* --------------------------- Low level MP encoding -------------------------- */
 
-static void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
+static void mp_encode_bytes(lua_State *L, mp_buf *buf, const unsigned char *s, size_t len) {
     unsigned char hdr[5];
     int hdrlen;
 
@@ -158,12 +167,12 @@ static void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
         hdr[4] = len&0xff;
         hdrlen = 5;
     }
-    mp_buf_append(buf,hdr,hdrlen);
-    mp_buf_append(buf,s,len);
+    mp_buf_append(L, buf,hdr,hdrlen);
+    mp_buf_append(L, buf,s,len);
 }
 
 /* we assume IEEE 754 internal format for single and double precision floats. */
-static void mp_encode_double(mp_buf *buf, double d) {
+static void mp_encode_double(lua_State *L, mp_buf *buf, double d) {
     unsigned char b[9];
     float f = d;
 
@@ -172,16 +181,16 @@ static void mp_encode_double(mp_buf *buf, double d) {
         b[0] = 0xca;    /* float IEEE 754 */
         memcpy(b+1,&f,4);
         memrevifle(b+1,4);
-        mp_buf_append(buf,b,5);
+        mp_buf_append(L, buf,b,5);
     } else if (sizeof(d) == 8) {
         b[0] = 0xcb;    /* double IEEE 754 */
         memcpy(b+1,&d,8);
         memrevifle(b+1,8);
-        mp_buf_append(buf,b,9);
+        mp_buf_append(L, buf,b,9);
     }
 }
 
-static void mp_encode_int(mp_buf *buf, int64_t n) {
+static void mp_encode_int(lua_State *L, mp_buf *buf, int64_t n) {
     unsigned char b[9];
     int enclen;
 
@@ -250,10 +259,10 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
             enclen = 9;
         }
     }
-    mp_buf_append(buf,b,enclen);
+    mp_buf_append(L, buf,b,enclen);
 }
 
-static void mp_encode_array(mp_buf *buf, int64_t n) {
+static void mp_encode_array(lua_State *L, mp_buf *buf, int64_t n) {
     unsigned char b[5];
     int enclen;
 
@@ -273,10 +282,10 @@ static void mp_encode_array(mp_buf *buf, int64_t n) {
         b[4] = n & 0xff;
         enclen = 5;
     }
-    mp_buf_append(buf,b,enclen);
+    mp_buf_append(L, buf,b,enclen);
 }
 
-static void mp_encode_map(mp_buf *buf, int64_t n) {
+static void mp_encode_map(lua_State *L, mp_buf *buf, int64_t n) {
     unsigned char b[5];
     int enclen;
 
@@ -296,7 +305,7 @@ static void mp_encode_map(mp_buf *buf, int64_t n) {
         b[4] = n & 0xff;
         enclen = 5;
     }
-    mp_buf_append(buf,b,enclen);
+    mp_buf_append(L, buf,b,enclen);
 }
 
 /* ----------------------------- Lua types encoding --------------------------- */
@@ -306,21 +315,21 @@ static void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
     const char *s;
 
     s = lua_tolstring(L,-1,&len);
-    mp_encode_bytes(buf,(const unsigned char*)s,len);
+    mp_encode_bytes(L, buf,(const unsigned char*)s,len);
 }
 
 static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
     unsigned char b = lua_toboolean(L,-1) ? 0xc3 : 0xc2;
-    mp_buf_append(buf,&b,1);
+    mp_buf_append(L, buf,&b,1);
 }
 
 static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
     if (floor(n) != n) {
-        mp_encode_double(buf,(double)n);
+        mp_encode_double(L, buf,(double)n);
     } else {
-        mp_encode_int(buf,(int64_t)n);
+        mp_encode_int(L, buf,(int64_t)n);
     }
 }
 
@@ -330,7 +339,7 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
 static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
     size_t len = lua_objlen(L,-1), j;
 
-    mp_encode_array(buf,len);
+    mp_encode_array(L, buf,len);
     for (j = 1; j <= len; j++) {
         lua_pushnumber(L,j);
         lua_gettable(L,-2);
@@ -353,7 +362,7 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
     }
 
     /* Step two: actually encoding of the map. */
-    mp_encode_map(buf,len);
+    mp_encode_map(L, buf,len);
     lua_pushnil(L);
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
@@ -407,7 +416,7 @@ static void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
     unsigned char b[1];
 
     b[0] = 0xc0;
-    mp_buf_append(buf,b,1);
+    mp_buf_append(L, buf,b,1);
 }
 
 static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
@@ -427,11 +436,11 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
 }
 
 static int mp_pack(lua_State *L) {
-    mp_buf *buf = mp_buf_new();
+    mp_buf *buf = mp_buf_new(L);
 
     mp_encode_lua_type(L,buf,0);
     lua_pushlstring(L,(char*)buf->b,buf->len);
-    mp_buf_free(buf);
+    mp_buf_free(L, buf);
     return 1;
 }
 
@@ -665,23 +674,23 @@ static int mp_unpack(lua_State *L) {
     }
 
     s = (const unsigned char*) lua_tolstring(L,-1,&len);
-    c = mp_cur_new(s,len);
+    c = mp_cur_new(L, s,len);
     mp_decode_to_lua_type(L,c);
     
     if (c->err == MP_CUR_ERROR_EOF) {
-        mp_cur_free(c);
+        mp_cur_free(L, c);
         lua_pushstring(L,"Missing bytes in input.");
         lua_error(L);
     } else if (c->err == MP_CUR_ERROR_BADFMT) {
-        mp_cur_free(c);
+        mp_cur_free(L, c);
         lua_pushstring(L,"Bad data format in input.");
         lua_error(L);
     } else if (c->left != 0) {
-        mp_cur_free(c);
+        mp_cur_free(L, c);
         lua_pushstring(L,"Extra bytes in input.");
         lua_error(L);
     }
-    mp_cur_free(c);
+    mp_cur_free(L, c);
     return 1;
 }
 
