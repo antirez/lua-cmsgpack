@@ -94,7 +94,7 @@ static void mp_cur_init(mp_cur *cursor, const unsigned char *s, size_t len) {
 
 /* --------------------------- Low level MP encoding -------------------------- */
 
-static void mp_encode_bytes(luaL_Buffer *buf, const unsigned char *s, size_t len) {
+static void mp_encode_string(luaL_Buffer *buf, size_t len) {
     unsigned char hdr[5];
     int hdrlen;
 
@@ -115,7 +115,6 @@ static void mp_encode_bytes(luaL_Buffer *buf, const unsigned char *s, size_t len
         hdrlen = 5;
     }
     luaL_addlstring(buf,(const char*)hdr,hdrlen);
-    luaL_addlstring(buf,(const char*)s,len);
 }
 
 /* we assume IEEE 754 internal format for single and double precision floats. */
@@ -262,7 +261,9 @@ static void mp_encode_lua_string(lua_State *L, luaL_Buffer *buf) {
     const char *s;
 
     s = lua_tolstring(L,-1,&len);
-    mp_encode_bytes(buf,(const unsigned char*)s,len);
+    mp_encode_string(buf,len);
+    lua_pushlstring(buf->L,s,len);
+    luaL_addvalue(buf);
 }
 
 static void mp_encode_lua_bool(lua_State *L, luaL_Buffer *buf) {
@@ -379,12 +380,15 @@ static void mp_encode_lua_type(lua_State *L, luaL_Buffer *buf, int level) {
     lua_pop(L,1);
 }
 
+static lua_State *L2;
+
 static int mp_pack(lua_State *L) {
     luaL_Buffer buf;
-    luaL_buffinit(L, &buf);
+    luaL_buffinit(L2, &buf);
 
     mp_encode_lua_type(L,&buf,0);
     luaL_pushresult(&buf);  /* close buffer */
+    lua_xmove(L2,L,1);
     return 1;
 }
 
@@ -644,6 +648,7 @@ static const struct luaL_reg thislib[] = {
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
     luaL_register(L, "cmsgpack", thislib);
+    L2 = luaL_newstate();
 
     lua_pushliteral(L, LUACMSGPACK_VERSION);
     lua_setfield(L, -2, "_VERSION");
