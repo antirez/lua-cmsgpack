@@ -111,17 +111,10 @@ typedef struct mp_cur {
     int err;
 } mp_cur;
 
-static mp_cur *mp_cur_new(const unsigned char *s, size_t len) {
-    mp_cur *cursor = malloc(sizeof(*cursor));
-
+static void mp_cur_init(mp_cur *cursor, const unsigned char *s, size_t len) {
     cursor->p = s;
     cursor->left = len;
     cursor->err = MP_CUR_ERROR_NONE;
-    return cursor;
-}
-
-static void mp_cur_free(mp_cur *cursor) {
-    free(cursor);
 }
 
 #define mp_cur_consume(_c,_len) do { _c->p += _len; _c->left -= _len; } while(0)
@@ -657,7 +650,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
 static int mp_unpack(lua_State *L) {
     size_t len;
     const unsigned char *s;
-    mp_cur *c;
+    mp_cur c;
 
     if (!lua_isstring(L,-1)) {
         lua_pushstring(L,"MessagePack decoding needs a string as input.");
@@ -665,23 +658,19 @@ static int mp_unpack(lua_State *L) {
     }
 
     s = (const unsigned char*) lua_tolstring(L,-1,&len);
-    c = mp_cur_new(s,len);
-    mp_decode_to_lua_type(L,c);
-    
-    if (c->err == MP_CUR_ERROR_EOF) {
-        mp_cur_free(c);
+    mp_cur_init(&c, s,len);
+    mp_decode_to_lua_type(L,&c);
+
+    if (c.err == MP_CUR_ERROR_EOF) {
         lua_pushstring(L,"Missing bytes in input.");
         lua_error(L);
-    } else if (c->err == MP_CUR_ERROR_BADFMT) {
-        mp_cur_free(c);
+    } else if (c.err == MP_CUR_ERROR_BADFMT) {
         lua_pushstring(L,"Bad data format in input.");
         lua_error(L);
-    } else if (c->left != 0) {
-        mp_cur_free(c);
+    } else if (c.left != 0) {
         lua_pushstring(L,"Extra bytes in input.");
         lua_error(L);
     }
-    mp_cur_free(c);
     return 1;
 }
 
