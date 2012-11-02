@@ -133,17 +133,10 @@ typedef struct mp_cur {
     int err;
 } mp_cur;
 
-static mp_cur *mp_cur_new(const unsigned char *s, size_t len) {
-    mp_cur *cursor = (mp_cur*)malloc(sizeof(*cursor));
-
+static void mp_cur_init(mp_cur *cursor, const unsigned char *s, size_t len) {
     cursor->p = s;
     cursor->left = len;
     cursor->err = MP_CUR_ERROR_NONE;
-    return cursor;
-}
-
-static void mp_cur_free(mp_cur *cursor) {
-    free(cursor);
 }
 
 #define mp_cur_consume(_c,_len) do { _c->p += _len; _c->left -= _len; } while(0)
@@ -736,12 +729,12 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
 
 static int mp_unpack_full(lua_State *L, int limit, int offset) {
     size_t len;
-    const unsigned char *s;
-    mp_cur *c;
+    const char *s;
+    mp_cur c;
     int cnt; /* Number of objects unpacked */
     int decode_all = (!limit && !offset);
 
-    s = (unsigned char*)luaL_checklstring(L,1,&len); /* if no match, exits */
+    s = luaL_checklstring(L,1,&len); /* if no match, exits */
 
     if (offset < 0 || limit < 0) /* requesting negative off or lim is invalid */
         return luaL_error(L,
@@ -753,18 +746,16 @@ static int mp_unpack_full(lua_State *L, int limit, int offset) {
 
     if (decode_all) limit = INT_MAX;
 
-    c = mp_cur_new(s+offset,len-offset);
+    mp_cur_init(&c,(const unsigned char *)s+offset,len-offset);
 
     /* We loop over the decode because this could be a stream
      * of multiple top-level values serialized together */
-    for(cnt = 0; c->left > 0 && cnt < limit; cnt++) {
-        mp_decode_to_lua_type(L,c);
+    for(cnt = 0; c.left > 0 && cnt < limit; cnt++) {
+        mp_decode_to_lua_type(L,&c);
 
-        if (c->err == MP_CUR_ERROR_EOF) {
-            mp_cur_free(c);
+        if (c.err == MP_CUR_ERROR_EOF) {
             return luaL_error(L,"Missing bytes in input.");
-        } else if (c->err == MP_CUR_ERROR_BADFMT) {
-            mp_cur_free(c);
+        } else if (c.err == MP_CUR_ERROR_BADFMT) {
             return luaL_error(L,"Bad data format in input.");
         }
     }
@@ -773,9 +764,9 @@ static int mp_unpack_full(lua_State *L, int limit, int offset) {
         /* c->left is the remaining size of the input buffer.
          * subtract the entire buffer size from the unprocessed size
          * to get our next start offset */
-        int offset = len - c->left;
+        int offset = len - c.left;
         /* Return offset -1 when we have have processed the entire buffer. */
-        lua_pushinteger(L, c->left == 0 ? -1 : offset);
+        lua_pushinteger(L, c.left == 0 ? -1 : offset);
         /* Results are returned with the arg elements still
          * in place. Lua takes care of only returning
          * elements above the args for us.
@@ -786,7 +777,6 @@ static int mp_unpack_full(lua_State *L, int limit, int offset) {
         cnt += 1; /* increase return count by one to make room for offset */
     }
 
-    mp_cur_free(c);
     return cnt;
 }
 
