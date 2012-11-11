@@ -258,21 +258,24 @@ static void mp_encode_map(luaL_Buffer *buf, int64_t n) {
 
 static void mp_encode_lua_string(lua_State *L, luaL_Buffer *buf) {
     size_t len;
-    const char *s;
 
-    s = lua_tolstring(L,-1,&len);
+    (void)lua_tolstring(L,-1,&len);
+    lua_insert(L, -buf->lvl - 1);
     mp_encode_string(buf,len);
-    lua_pushlstring(buf->L,s,len);
+    lua_pushvalue(L, -buf->lvl - 1);
+    lua_remove(L, -buf->lvl);
     luaL_addvalue(buf);
 }
 
 static void mp_encode_lua_bool(lua_State *L, luaL_Buffer *buf) {
     unsigned char b = lua_toboolean(L,-1) ? 0xc3 : 0xc2;
+    lua_pop(L,1);
     luaL_addchar(buf, b);
 }
 
 static void mp_encode_lua_number(lua_State *L, luaL_Buffer *buf) {
     lua_Number n = lua_tonumber(L,-1);
+    lua_pop(L,1);
 
     if (floor(n) != n) {
         mp_encode_double(buf,(double)n);
@@ -287,12 +290,14 @@ static void mp_encode_lua_type(lua_State *L, luaL_Buffer *buf, int level);
 static void mp_encode_lua_table_as_array(lua_State *L, luaL_Buffer *buf, int level) {
     size_t len = lua_objlen(L,-1), j;
 
+    lua_insert(L, -buf->lvl - 1);
     mp_encode_array(buf,len);
     for (j = 1; j <= len; j++) {
         lua_pushnumber(L,j);
-        lua_gettable(L,-2);
+        lua_gettable(L,-buf->lvl - 2);
         mp_encode_lua_type(L,buf,level+1);
     }
+    lua_remove(L, -buf->lvl - 1);
 }
 
 /* Convert a lua table into a message pack key-value map. */
@@ -310,14 +315,16 @@ static void mp_encode_lua_table_as_map(lua_State *L, luaL_Buffer *buf, int level
     }
 
     /* Step two: actually encoding of the map. */
+    lua_insert(L, -buf->lvl - 1);
     mp_encode_map(buf,len);
     lua_pushnil(L);
-    while(lua_next(L,-2)) {
+    while(lua_next(L,-buf->lvl - 2)) {
         /* Stack: ... key value */
         lua_pushvalue(L,-2); /* Stack: ... key value key */
         mp_encode_lua_type(L,buf,level+1); /* encode key */
         mp_encode_lua_type(L,buf,level+1); /* encode val */
     }
+    lua_remove(L, -buf->lvl - 1);
 }
 
 /* Returns true if the Lua table on top of the stack is exclusively composed
@@ -360,8 +367,9 @@ static void mp_encode_lua_table(lua_State *L, luaL_Buffer *buf, int level) {
         mp_encode_lua_table_as_map(L,buf,level);
 }
 
-static void mp_encode_lua_null(luaL_Buffer *buf) {
+static void mp_encode_lua_null(lua_State *L, luaL_Buffer *buf) {
     luaL_addchar(buf, 0xC0);
+    lua_pop(L,1);
 }
 
 static void mp_encode_lua_type(lua_State *L, luaL_Buffer *buf, int level) {
@@ -375,20 +383,16 @@ static void mp_encode_lua_type(lua_State *L, luaL_Buffer *buf, int level) {
     case LUA_TBOOLEAN: mp_encode_lua_bool(L,buf); break;
     case LUA_TNUMBER: mp_encode_lua_number(L,buf); break;
     case LUA_TTABLE: mp_encode_lua_table(L,buf,level); break;
-    default: mp_encode_lua_null(buf); break;
+    default: mp_encode_lua_null(L,buf); break;
     }
-    lua_pop(L,1);
 }
-
-static lua_State *L2;
 
 static int mp_pack(lua_State *L) {
     luaL_Buffer buf;
-    luaL_buffinit(L2, &buf);
+    luaL_buffinit(L, &buf);
 
     mp_encode_lua_type(L,&buf,0);
     luaL_pushresult(&buf);  /* close buffer */
-    lua_xmove(L2,L,1);
     return 1;
 }
 
@@ -648,7 +652,6 @@ static const struct luaL_reg thislib[] = {
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
     luaL_register(L, "cmsgpack", thislib);
-    L2 = luaL_newstate();
 
     lua_pushliteral(L, LUACMSGPACK_VERSION);
     lua_setfield(L, -2, "_VERSION");
