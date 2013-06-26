@@ -367,26 +367,24 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx = 0;
+    long idx = 0;
     lua_Number n;
 
     lua_pushnil(L);
     while(lua_next(L,-2)) {
+		idx++;
         /* Stack: ... key value */
         lua_pop(L,1); /* Stack: ... key */
         if (!lua_isnumber(L,-1)) goto not_array;
         n = lua_tonumber(L,-1);
-        idx = n;
         if (idx != n || idx < 1) goto not_array;
-        count++;
-        max = idx;
     }
     /* We have the total number of elements in "count". Also we have
      * the max index encountered in "idx". We can't reach this code
      * if there are indexes <= 0. If you also note that there can not be
      * repeated keys into a table, you have that if idx==count you are sure
      * that there are all the keys form 1 to count (both included). */
-    return idx == count;
+    return 1;
 
 not_array:
     lua_pop(L,1);
@@ -437,12 +435,108 @@ static int mp_pack(lua_State *L) {
 
 /* --------------------------------- Decoding --------------------------------- */
 
+unsigned int next_power_of_two(int n)
+{
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n++;
+	return n;
+}
+
+int get_narray(mp_cur *c, size_t len) {
+	const unsigned char *curr = c->p; 
+	int narray = 0; 
+	int i; 
+	int idx = 0;
+	int value; 
+	for (i = 0;  i < len * 2; i++) {
+		switch (curr[0]) {
+		case 0xcc:  /* uint 8 */
+		case 0xd0:  /* int 8 */
+			if (i % 2 == 0) {
+				idx++; 
+				if (idx == curr[1] || curr[1] <= next_power_of_two(idx))
+					narray++; 
+				else 
+					return narray;
+			}
+			curr += 2;
+			break;
+		case 0xcd:  /* uint 16 */
+		case 0xd1:  /* int 16 */
+			if (i % 2 == 0) {
+				idx++; 
+				value = (curr[1] << 8) | curr[2];
+				if (idx == value || value <= next_power_of_two(idx)) 
+					narray++; 
+				else
+					return narray;
+			}
+			curr += 3;
+			break;
+		case 0xce:  /* uint 32 */
+		case 0xd2:  /* int 32 */
+			if (i % 2 == 0) {
+				idx++; 
+				value = ((uint32_t)curr[1] << 24) |
+						((uint32_t)curr[2] << 16) |
+						((uint32_t)curr[3] << 8) |
+						 (uint32_t)curr[4]; 
+				if (idx == value || value <= next_power_of_two(idx))
+					narray++; 
+				else 
+					return narray;
+			}
+			curr += 5;
+			break;
+		case 0xcf:  /* uint 64 */
+		case 0xd3:  /* int 64 */
+			if (i % 2 == 0) {
+				idx++; 
+				value =	((uint64_t)curr[1] << 56) |
+						((uint64_t)curr[2] << 48) |
+						((uint64_t)curr[3] << 40) |
+						((uint64_t)curr[4] << 32) |
+						((uint64_t)curr[5] << 24) |
+						((uint64_t)curr[6] << 16) |
+						((uint64_t)curr[7] << 8) |
+						 (uint64_t)curr[8];
+				if (idx == value || value <= next_power_of_two(idx))
+					narray++; 
+				else
+					return narray;
+			}
+			curr += 9;
+			break;
+		 default:    /* types that can't be idenitified by first byte value. */
+			if ((curr[0] & 0x80) == 0) {   /* positive fixnum */
+				curr += 1; 
+				if (i % 2 == 0) {
+					idx++;
+					if (idx == curr[0] || curr[0] <= next_power_of_two(idx)) {
+						narray++; 
+					} else {
+						return narray;
+					}
+				}
+			} else {  /* negative fixnum */
+				return narray; 
+			}
+		}
+	}
+	return narray; 
+}
+
 void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
 
 void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
     int index = 1;
-
-    lua_newtable(L);
+    /*lua_newtable(L);*/
+    lua_createtable(L, len, 0);
     while(len--) {
         lua_pushnumber(L,index++);
         mp_decode_to_lua_type(L,c);
@@ -452,7 +546,12 @@ void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
 }
 
 void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
-    lua_newtable(L);
+	int narray; 
+	int nhash;
+	narray = get_narray(c, len); 
+	nhash = len - narray; 
+	lua_createtable(L, narray, nhash);
+	/*lua_newtable(L);*/
     while(len--) {
         mp_decode_to_lua_type(L,c); /* key */
         if (c->err) return;
