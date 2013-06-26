@@ -514,7 +514,6 @@ int get_narray(mp_cur *c, size_t len) {
 			break;
 		 default:    /* types that can't be idenitified by first byte value. */
 			if ((curr[0] & 0x80) == 0) {   /* positive fixnum */
-				curr += 1; 
 				if (i % 2 == 0) {
 					idx++;
 					if (idx == curr[0] || curr[0] <= next_power_of_two(idx)) {
@@ -523,7 +522,8 @@ int get_narray(mp_cur *c, size_t len) {
 						return narray;
 					}
 				}
-			} else {  /* negative fixnum */
+			curr += 1; 
+			} else {  /* other */
 				return narray; 
 			}
 		}
