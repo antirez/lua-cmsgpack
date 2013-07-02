@@ -447,8 +447,9 @@ unsigned int next_power_of_two(int n)
 	return n;
 }
 
-int get_narray(mp_cur *c, size_t len) {
+int calc_array_num(mp_cur *c, size_t len) {
 	const unsigned char *curr = c->p; 
+	size_t left = c->left;
 	int narray = 0; 
 	int i; 
 	int idx = 0;
@@ -459,17 +460,25 @@ int get_narray(mp_cur *c, size_t len) {
 		case 0xd0:  /* int 8 */
 			if (i % 2 == 0) {
 				idx++; 
+				if (left < 2) {
+					return narray; 
+				}
+
 				if (idx == curr[1] || curr[1] <= next_power_of_two(idx))
 					narray++; 
 				else 
 					return narray;
 			}
 			curr += 2;
+			left -=2; 
 			break;
 		case 0xcd:  /* uint 16 */
 		case 0xd1:  /* int 16 */
 			if (i % 2 == 0) {
 				idx++; 
+				if (left < 3) {
+					return narray; 
+				}
 				value = (curr[1] << 8) | curr[2];
 				if (idx == value || value <= next_power_of_two(idx)) 
 					narray++; 
@@ -477,11 +486,15 @@ int get_narray(mp_cur *c, size_t len) {
 					return narray;
 			}
 			curr += 3;
+			left -= 3; 
 			break;
 		case 0xce:  /* uint 32 */
 		case 0xd2:  /* int 32 */
 			if (i % 2 == 0) {
 				idx++; 
+				if (left < 5) {
+					return narray; 
+				}
 				value = ((uint32_t)curr[1] << 24) |
 						((uint32_t)curr[2] << 16) |
 						((uint32_t)curr[3] << 8) |
@@ -492,11 +505,16 @@ int get_narray(mp_cur *c, size_t len) {
 					return narray;
 			}
 			curr += 5;
+			left -= 5; 
 			break;
 		case 0xcf:  /* uint 64 */
 		case 0xd3:  /* int 64 */
 			if (i % 2 == 0) {
 				idx++; 
+				if (left < 9) {
+					return narray; 
+				}
+
 				value =	((uint64_t)curr[1] << 56) |
 						((uint64_t)curr[2] << 48) |
 						((uint64_t)curr[3] << 40) |
@@ -511,6 +529,7 @@ int get_narray(mp_cur *c, size_t len) {
 					return narray;
 			}
 			curr += 9;
+			left -= 9; 
 			break;
 		 default:    /* types that can't be idenitified by first byte value. */
 			if ((curr[0] & 0x80) == 0) {   /* positive fixnum */
@@ -523,6 +542,7 @@ int get_narray(mp_cur *c, size_t len) {
 					}
 				}
 			curr += 1; 
+			left -= 1; 
 			} else {  /* other */
 				return narray; 
 			}
@@ -535,8 +555,8 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
 
 void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
     int index = 1;
-    /*lua_newtable(L);*/
-    lua_createtable(L, len, 0);
+	/*lua_newtable(L);*/
+	lua_createtable(L, len, 0);
     while(len--) {
         lua_pushnumber(L,index++);
         mp_decode_to_lua_type(L,c);
@@ -548,7 +568,7 @@ void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
 void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
 	int narray; 
 	int nhash;
-	narray = get_narray(c, len); 
+	narray = calc_array_num(c, len); 
 	nhash = len - narray; 
 	lua_createtable(L, narray, nhash);
 	/*lua_newtable(L);*/
