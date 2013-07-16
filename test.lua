@@ -169,10 +169,10 @@ hash_num = 5
 arrary_num = 1000000
 large_table = {}
 for i = 1, hash_num do
-	large_table[string.random(5, "%l%d%u")] = i
+    large_table[string.random(5, "%l%d%u")] = i
 end
 for i = 1, arrary_num do
-	large_table[i] = i + 10000000
+    large_table[i] = i + 10000000
 end
 test_circular("fix large map (2)", large_table)
 
@@ -185,17 +185,17 @@ hash_num = 5
 arrary_num = 65530
 medium_table = {}
 for i = 1, hash_num do
-	medium_table[string.random(5, "%l%d%u")] = i
+    medium_table[string.random(5, "%l%d%u")] = i
 end
 for i = 1, arrary_num do
-	medium_table[i] = i + 10000000
+    medium_table[i] = i + 10000000
 end
 test_circular("fix large map (4)", medium_table)
 
 arrary_num = 1000000
 large_array = {}
 for i = 1, arrary_num do
-	large_array[i] = i + 10000000
+    large_array[i] = i + 10000000
 end
 test_circular("large array", large_array)
 
@@ -222,11 +222,19 @@ test_pack_and_unpack("raw16","                                        ","da00282
 test_pack_and_unpack("array 16",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},"dc001000000000000000000000000000000000")
 
 -- Regression test for issue #4, cyclic references in tables.
-a = {x=nil,y=5}
-b = {x=a}
-a['x'] = b
-pack = cmsgpack.pack(a)
-test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
+function cyclic_refer_test()
+    a = {x=nil,y=5}
+    b = {x=a}
+    a['x'] = b
+    cmsgpack.pack(a)
+end
+
+if pcall(cyclic_refer_test) then
+    print "FAILED: exception no throw"
+else
+    print "Testing max nesting ...ok"
+end
+-- test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
 
 -- Final report
 print()

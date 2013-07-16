@@ -14,7 +14,8 @@
 LUA_VERSION =       5.1
 TARGET =            cmsgpack.so
 PREFIX =            /usr/local
-CFLAGS =            -g -Wall -pedantic -fno-inline -fprofile-arcs -ftest-coverage -lgcov
+CFLAGS =            -g -O3 -Wall -pedantic -DNDEBUG -DLUA_USE_APICHECK
+#CFLAGS =            -g -Wall -pedantic -fno-inline -fprofile-arcs -ftest-coverage -lgcov
 #CFLAGS =            -O3 -Wall -pedantic -DNDEBUG
 CMSGPACK_CFLAGS =      -fpic
 CMSGPACK_LDFLAGS =     -shared -fprofile-arcs

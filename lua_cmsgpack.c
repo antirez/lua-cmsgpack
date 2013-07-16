@@ -11,7 +11,7 @@
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
-#define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
+#define LUACMSGPACK_MAX_NESTING  9 /* Max tables nesting. */
 
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
@@ -413,7 +413,12 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
 
     /* Limit the encoding of nested tables to a specfiied maximum depth, so that
      * we survive when called against circular references in tables. */
-    if (t == LUA_TTABLE && level == LUACMSGPACK_MAX_NESTING) t = LUA_TNIL;
+    if (t == LUA_TTABLE && level == LUACMSGPACK_MAX_NESTING) {
+        t = LUA_TNIL;
+        lua_pushliteral(L, "table nesting level too deep");
+        lua_error(L);
+    }
+
     switch(t) {
     case LUA_TSTRING: mp_encode_lua_string(L,buf); break;
     case LUA_TBOOLEAN: mp_encode_lua_bool(L,buf); break;
