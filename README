@@ -10,20 +10,9 @@ The library is currently considered in BETA STAGE for lack of extensive testing.
 INSTALLATION
 ---
 
-Using LuaRocks (http://luarocks.org):
+    make 
+    sudo make install
 
-* Install current stable release:
-
-    sudo luarocks install lua-cmsgpack
-
-* Install current Git master head from GitHub:
-
-    sudo luarocks install lua-cmsgpack --from=rocks-cvs
-
-* Install from current working copy
-
-    cd lua-cmsgpack/
-    sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec
 
 If you embed Lua and all modules into your C project, just add the
 lua_cmsgpack.c file and call the following function after creating the Lua
@@ -54,9 +43,9 @@ maps.
 NESTED TABLES
 ---
 Nested tables are handled correctly up to LUACMSGPACK_MAX_NESTING levels of
-nesting (that is set to 16 by default).
+nesting (that is set to 9 by default).
 Every table that is nested at a greater level than the maxium is encoded
-as MessagePack nil value.
+as MessagePack nil value and throw a exception.
 
 It is worth to note that in Lua it is possible to create tables that mutually
 refer to each other, creating a cycle. For example:
@@ -65,8 +54,7 @@ a = {x=nil,y=5}
 b = {x=a}
 a['x'] = b
 
-This condition will simply make the encoder reach the max level of nesting,
-thus avoiding an infinite loop.
+This condition will throw a exception.
 
 CREDITS
 ---
