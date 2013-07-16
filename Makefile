@@ -14,11 +14,12 @@
 LUA_VERSION =       5.1
 TARGET =            cmsgpack.so
 PREFIX =            /usr/local
-CFLAGS =            -g -O3 -Wall -pedantic -DNDEBUG -DLUA_USE_APICHECK
+CFLAGS =            -g -O3 -Wall -pedantic
 #CFLAGS =            -g -Wall -pedantic -fno-inline -fprofile-arcs -ftest-coverage -lgcov
 #CFLAGS =            -O3 -Wall -pedantic -DNDEBUG
 CMSGPACK_CFLAGS =      -fpic
-CMSGPACK_LDFLAGS =     -shared -fprofile-arcs
+CMSGPACK_LDFLAGS =     -shared
+#CMSGPACK_LDFLAGS =     -shared -fprofile-arcs
 LUA_INCLUDE_DIR =   $(PREFIX)/include
 LUA_CMODULE_DIR =   $(PREFIX)/lib/lua/$(LUA_VERSION)
 LUA_MODULE_DIR =    $(PREFIX)/share/lua/$(LUA_VERSION)
