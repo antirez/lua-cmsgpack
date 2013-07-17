@@ -10,7 +10,7 @@ The library is currently considered in BETA STAGE for lack of extensive testing.
 INSTALLATION
 ---
 
-    make 
+    make
     sudo make install
 
 
