@@ -2,8 +2,13 @@
 -- Copyright(C) 2012 Salvatore Sanfilippo, All Rights Reserved.
 -- See the copyright notice at the end of lua_cmsgpack.c for more information.
 
+local cmsgpack      = require 'cmsgpack'
+local ok, cmsgpack_safe = pcall(require, 'cmsgpack.safe')
+if not ok then cmsgpack_safe = nil end
+
 passed = 0
 failed = 0 
+skipped = 0
 
 function hex(s)
     local i
@@ -92,6 +97,94 @@ function test_pack_and_unpack(name,obj,raw)
     test_unpack(name,raw,obj)
 end
 
+function test_error(name, fn)
+    io.write("Testing generate error '",name,"' ...")
+    local ok, ret, err = pcall(fn)
+    if ok then
+        print("ERROR: result ", ret, err)
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+function test_safe(name, fn)
+    io.write("Testing safe calling '",name,"' ...")
+    if not cmsgpack_safe then
+        print("skip: no `cmsgpack.safe` module")
+        skipped = skipped + 1
+        return
+    end
+    local ok, ret, err = pcall(fn)
+    if not ok then
+        print("ERROR: result ", ret, err)
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+local function test_multiple(name, ...)
+    io.write("Multiple test '",name,"' ...")
+    if not compare_objects({...},{cmsgpack.unpack(cmsgpack.pack(...))}) then
+        print("ERROR:", {...}, cmsgpack.unpack(cmsgpack.pack(...)))
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+local function test_global()
+    io.write("test global variable ...")
+
+    if _VERSION == "Lua 5.1" then
+        if not _G.cmsgpack then
+            print("ERROR: Lua 5.1 should set global")
+            failed = failed+1
+        else
+            print("ok")
+            passed = passed+1
+        end
+    else
+        if _G.cmsgpack then
+            print("ERROR: Lua 5.2 should not set global")
+            failed = failed+1
+        else
+            print("ok")
+            passed = passed+1
+        end
+    end
+end
+
+local function test_array()
+    io.write("Testing array detection ...")
+
+    local a = {a1 = 1, a2 = 1, a3 = 1, a4 = 1, a5 = 1, a6 = 1, a7 = 1, a8 = 1, a9 = 1}
+    a[1] = 10 a[2] = 20 a[3] = 30
+    a.a1,a.a2,a.a3,a.a4,a.a5,a.a6,a.a7,a.a8, a.a9 = nil
+    
+    local test_obj = {10,20,30}
+    assert(compare_objects(test_obj, a))
+
+    local etalon = cmsgpack.pack(test_obj)
+    local encode = cmsgpack.pack(a)
+
+    if etalon ~= encode then
+        print("ERROR:")
+        print("", "expected: ", hex(etalon))
+        print("", "     got: ", hex(encode))
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+test_global()
+test_array()
 test_circular("positive fixnum",17);
 test_circular("negative fixnum",-1);
 test_circular("true boolean",true);
@@ -118,6 +211,18 @@ test_circular("fix array (1)",{1,2,3,"foo"})
 test_circular("fix array (2)",{})
 test_circular("fix array (3)",{1,{},{}})
 test_circular("fix map",{a=5,b=10,c="string"})
+test_circular("positive infinity", math.huge)
+test_circular("negative infinity", -math.huge)
+test_circular("map with number keys", {["1"] = {1,2,3}})
+test_circular("map with float keys", {[1.5] = {1,2,3}})
+test_error("unpack nil", function() cmsgpack.unpack(nil) end)
+test_error("unpack table", function() cmsgpack.unpack({}) end)
+test_error("unpack udata", function() cmsgpack.unpack(io.stdout) end)
+test_safe("unpack table", function() cmsgpack_safe.unpack({}) end)
+test_safe("unpack nil", function() cmsgpack_safe.unpack(nil) end)
+test_safe("unpack udata", function() cmsgpack_safe.unpack(io.stdout) end)
+test_multiple("two ints", 1, 2)
+test_multiple("holes", 1, nil, 2, nil, 4)
 
 -- The following test vectors are taken from the Javascript lib at:
 -- https://github.com/cuzic/MessagePack-JS/blob/master/test/test_pack.html
@@ -150,5 +255,6 @@ test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17
 
 -- Final report
 print()
-print("TEST PASSED:",passed)
-print("TEST FAILED:",failed)
+print("TEST  PASSED:",passed)
+print("TEST  FAILED:",failed)
+print("TEST SKIPPED:",skipped)
