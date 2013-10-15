@@ -31,6 +31,32 @@
  * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
  * ============================================================================ */
 
+#if LUA_VERSION_NUM >= 502 // lua 5.2
+
+#define lua_objlen      lua_rawlen
+
+static void luaL_register (lua_State *L, const char *libname, const luaL_Reg *l){
+  if(libname) lua_newtable(L);
+  luaL_setfuncs(L, l, 0);
+}
+
+#endif
+
+/*
+ * Compatibility wrapper to determine whether a float/double x is finite.
+ */
+#if _XOPEN_SOURCE >= 600 || _ISOC99_SOURCE || _POSIX_C_SOURCE >= 200112L
+#	define IS_FINITE(x) isfinite(x)
+#else
+#	define IS_FINITE(x) ((x) == (x) && (x) + 1 > (x))
+#endif
+
+/* Checks if a float or double value x can be represented as an integer of type T without loss of precision */
+#define IS_INT_TYPE_EQUIVALENT(x, T) (IS_FINITE(x) && (T)(x) == (x))
+
+#define IS_INT64_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int64_t)
+#define IS_INT_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int)
+
 /* --------------------------- Endian conversion --------------------------------
  * We use it only for floats and doubles, all the other conversions are performed
  * in an endian independent fashion. So the only thing we need is a function
@@ -299,6 +325,22 @@ static void mp_encode_map(mp_buf *buf, int64_t n) {
     mp_buf_append(buf,b,enclen);
 }
 
+
+/* ----------------------------- Lua fail functions --------------------------- */
+
+static int mp_err_fail(lua_State *L, const char *msg){
+    lua_pushstring(L,msg);
+    return lua_error(L);
+}
+
+static int mp_safe_fail(lua_State *L, const char *msg){
+    lua_pushnil(L);
+    lua_pushstring(L,msg);
+    return 2;
+}
+
+typedef int (*mp_fail_ptr) (lua_State *, const char *);
+
 /* ----------------------------- Lua types encoding --------------------------- */
 
 static void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
@@ -317,10 +359,10 @@ static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
 static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
-    if (floor(n) != n) {
-        mp_encode_double(buf,(double)n);
-    } else {
+    if (IS_INT64_EQUIVALENT(n)) {
         mp_encode_int(buf,(int64_t)n);
+    } else {
+        mp_encode_double(buf,(double)n);
     }
 }
 
@@ -379,14 +421,14 @@ static int table_is_an_array(lua_State *L) {
         idx = n;
         if (idx != n || idx < 1) goto not_array;
         count++;
-        max = idx;
+        if (max < idx) max = idx;
     }
     /* We have the total number of elements in "count". Also we have
      * the max index encountered in "idx". We can't reach this code
      * if there are indexes <= 0. If you also note that there can not be
      * repeated keys into a table, you have that if idx==count you are sure
      * that there are all the keys form 1 to count (both included). */
-    return idx == count;
+    return max == count;
 
 not_array:
     lua_pop(L,1);
@@ -426,12 +468,30 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     lua_pop(L,1);
 }
 
+/*
+ * Packs all arguments as a stream.
+ * Returns the empty string if no argument was given.
+ */
 static int mp_pack(lua_State *L) {
-    mp_buf *buf = mp_buf_new();
+    int i, nargs = lua_gettop(L);
+    if(nargs == 0) {
+        lua_pushliteral(L, "");
+        return 1;
+    }
 
+    for(i = 1; i <= nargs; i++) {
+        mp_buf *buf;
+        lua_pushvalue(L, i);
+
+        buf = mp_buf_new();
     mp_encode_lua_type(L,buf,0);
+        
+        lua_settop(L, nargs + i - 1);
     lua_pushlstring(L,(char*)buf->b,buf->len);
     mp_buf_free(buf);
+    }
+    
+    lua_concat(L, nargs);
     return 1;
 }
 
@@ -654,54 +714,75 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     }
 }
 
-static int mp_unpack(lua_State *L) {
+static int mp_unpack_impl(lua_State *L, mp_fail_ptr mp_fail) {
     size_t len;
     const unsigned char *s;
     mp_cur *c;
+    int cnt;/* Number of objects unpacked */
 
     if (!lua_isstring(L,-1)) {
-        lua_pushstring(L,"MessagePack decoding needs a string as input.");
-        lua_error(L);
+        return mp_fail(L,"MessagePack decoding needs a string as input.");
     }
 
     s = (const unsigned char*) lua_tolstring(L,-1,&len);
     c = mp_cur_new(s,len);
-    mp_decode_to_lua_type(L,c);
-    
-    if (c->err == MP_CUR_ERROR_EOF) {
-        mp_cur_free(c);
-        lua_pushstring(L,"Missing bytes in input.");
-        lua_error(L);
-    } else if (c->err == MP_CUR_ERROR_BADFMT) {
-        mp_cur_free(c);
-        lua_pushstring(L,"Bad data format in input.");
-        lua_error(L);
-    } else if (c->left != 0) {
-        mp_cur_free(c);
-        lua_pushstring(L,"Extra bytes in input.");
-        lua_error(L);
+
+    for(cnt = 0; c->left > 0; cnt++) {
+        mp_decode_to_lua_type(L,c);
+        
+        if (c->err == MP_CUR_ERROR_EOF) {
+           mp_cur_free(c);
+            return mp_fail(L,"Missing bytes in input.");
+        } else if (c->err == MP_CUR_ERROR_BADFMT) {
+            mp_cur_free(c);
+            return mp_fail(L,"Bad data format in input.");
+        }
     }
+    
     mp_cur_free(c);
-    return 1;
+    return cnt;
+}
+
+static int mp_unpack(lua_State *L){
+    return mp_unpack_impl(L, mp_err_fail);
+}
+
+static int mp_unpack_safe(lua_State *L){
+    return mp_unpack_impl(L, mp_safe_fail);
 }
 
 /* ---------------------------------------------------------------------------- */
 
-static const struct luaL_reg thislib[] = {
+static const struct luaL_Reg thislib[] = {
     {"pack", mp_pack},
     {"unpack", mp_unpack},
     {NULL, NULL}
 };
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
-    luaL_register(L, "cmsgpack", thislib);
+    lua_settop(L, 0);
+    lua_newtable(L);
+    luaL_register(L, 0, thislib);
 
     lua_pushliteral(L, LUACMSGPACK_VERSION);
     lua_setfield(L, -2, "_VERSION");
     lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
     lua_setfield(L, -2, "_COPYRIGHT");
     lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
-    lua_setfield(L, -2, "_DESCRIPTION"); 
+    lua_setfield(L, -2, "_DESCRIPTION");
+
+#if LUA_VERSION_NUM < 502
+    lua_pushvalue(L, -1);
+    lua_setglobal(L, "cmsgpack");
+#endif
+
+    return 1;
+}
+
+LUALIB_API int luaopen_cmsgpack_safe (lua_State *L) {
+    luaopen_cmsgpack(L);
+    lua_pushcfunction(L, mp_unpack_safe);
+    lua_setfield(L, -2, "unpack");
     return 1;
 }
 
