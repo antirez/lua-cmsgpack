@@ -258,3 +258,7 @@ print()
 print("TEST  PASSED:",passed)
 print("TEST  FAILED:",failed)
 print("TEST SKIPPED:",skipped)
+
+if failed > 0 then
+    os.exit(1)
+end
