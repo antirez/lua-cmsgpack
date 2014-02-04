@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
@@ -56,42 +55,6 @@ static void memrevifle(void *ptr, size_t len) {
     }
 }
 
-/* ----------------------------- String buffer ----------------------------------
- * This is a simple implementation of string buffers. The only opereation
- * supported is creating empty buffers and appending bytes to it.
- * The string buffer uses 2x preallocation on every realloc for O(N) append
- * behavior.  */
-
-typedef struct mp_buf {
-    unsigned char *b;
-    size_t len, free;
-} mp_buf;
-
-static mp_buf *mp_buf_new(void) {
-    mp_buf *buf = malloc(sizeof(*buf));
-    
-    buf->b = NULL;
-    buf->len = buf->free = 0;
-    return buf;
-}
-
-void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
-    if (buf->free < len) {
-        size_t newlen = buf->len+len;
-
-        buf->b = realloc(buf->b,newlen*2);
-        buf->free = newlen;
-    }
-    memcpy(buf->b+buf->len,s,len);
-    buf->len += len;
-    buf->free -= len;
-}
-
-void mp_buf_free(mp_buf *buf) {
-    free(buf->b);
-    free(buf);
-}
-
 /* ------------------------------ String cursor ----------------------------------
  * This simple data structure is used for parsing. Basically you create a cursor
  * using a string pointer and a length, then it is possible to access the
@@ -111,17 +74,10 @@ typedef struct mp_cur {
     int err;
 } mp_cur;
 
-static mp_cur *mp_cur_new(const unsigned char *s, size_t len) {
-    mp_cur *cursor = malloc(sizeof(*cursor));
-
+static void mp_cur_init(mp_cur *cursor, const unsigned char *s, size_t len) {
     cursor->p = s;
     cursor->left = len;
     cursor->err = MP_CUR_ERROR_NONE;
-    return cursor;
-}
-
-static void mp_cur_free(mp_cur *cursor) {
-    free(cursor);
 }
 
 #define mp_cur_consume(_c,_len) do { _c->p += _len; _c->left -= _len; } while(0)
@@ -138,7 +94,7 @@ static void mp_cur_free(mp_cur *cursor) {
 
 /* --------------------------- Low level MP encoding -------------------------- */
 
-static void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
+static void mp_encode_string(luaL_Buffer *buf, size_t len) {
     unsigned char hdr[5];
     int hdrlen;
 
@@ -158,12 +114,11 @@ static void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
         hdr[4] = len&0xff;
         hdrlen = 5;
     }
-    mp_buf_append(buf,hdr,hdrlen);
-    mp_buf_append(buf,s,len);
+    luaL_addlstring(buf,(const char*)hdr,hdrlen);
 }
 
 /* we assume IEEE 754 internal format for single and double precision floats. */
-static void mp_encode_double(mp_buf *buf, double d) {
+static void mp_encode_double(luaL_Buffer *buf, double d) {
     unsigned char b[9];
     float f = d;
 
@@ -172,16 +127,16 @@ static void mp_encode_double(mp_buf *buf, double d) {
         b[0] = 0xca;    /* float IEEE 754 */
         memcpy(b+1,&f,4);
         memrevifle(b+1,4);
-        mp_buf_append(buf,b,5);
+        luaL_addlstring(buf,(const char*)b,5);
     } else if (sizeof(d) == 8) {
         b[0] = 0xcb;    /* double IEEE 754 */
         memcpy(b+1,&d,8);
         memrevifle(b+1,8);
-        mp_buf_append(buf,b,9);
+        luaL_addlstring(buf,(const char*)b,9);
     }
 }
 
-static void mp_encode_int(mp_buf *buf, int64_t n) {
+static void mp_encode_int(luaL_Buffer *buf, int64_t n) {
     unsigned char b[9];
     int enclen;
 
@@ -250,10 +205,10 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
             enclen = 9;
         }
     }
-    mp_buf_append(buf,b,enclen);
+    luaL_addlstring(buf,(const char*)b,enclen);
 }
 
-static void mp_encode_array(mp_buf *buf, int64_t n) {
+static void mp_encode_array(luaL_Buffer *buf, int64_t n) {
     unsigned char b[5];
     int enclen;
 
@@ -273,10 +228,10 @@ static void mp_encode_array(mp_buf *buf, int64_t n) {
         b[4] = n & 0xff;
         enclen = 5;
     }
-    mp_buf_append(buf,b,enclen);
+    luaL_addlstring(buf,(const char*)b,enclen);
 }
 
-static void mp_encode_map(mp_buf *buf, int64_t n) {
+static void mp_encode_map(luaL_Buffer *buf, int64_t n) {
     unsigned char b[5];
     int enclen;
 
@@ -296,26 +251,31 @@ static void mp_encode_map(mp_buf *buf, int64_t n) {
         b[4] = n & 0xff;
         enclen = 5;
     }
-    mp_buf_append(buf,b,enclen);
+    luaL_addlstring(buf,(const char*)b,enclen);
 }
 
 /* ----------------------------- Lua types encoding --------------------------- */
 
-static void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_string(lua_State *L, luaL_Buffer *buf) {
     size_t len;
-    const char *s;
 
-    s = lua_tolstring(L,-1,&len);
-    mp_encode_bytes(buf,(const unsigned char*)s,len);
+    (void)lua_tolstring(L,-1,&len);
+    lua_insert(L, -buf->lvl - 1);
+    mp_encode_string(buf,len);
+    lua_pushvalue(L, -buf->lvl - 1);
+    lua_remove(L, -buf->lvl);
+    luaL_addvalue(buf);
 }
 
-static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_bool(lua_State *L, luaL_Buffer *buf) {
     unsigned char b = lua_toboolean(L,-1) ? 0xc3 : 0xc2;
-    mp_buf_append(buf,&b,1);
+    lua_pop(L,1);
+    luaL_addchar(buf, b);
 }
 
-static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
+static void mp_encode_lua_number(lua_State *L, luaL_Buffer *buf) {
     lua_Number n = lua_tonumber(L,-1);
+    lua_pop(L,1);
 
     if (floor(n) != n) {
         mp_encode_double(buf,(double)n);
@@ -324,22 +284,24 @@ static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     }
 }
 
-static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
+static void mp_encode_lua_type(lua_State *L, luaL_Buffer *buf, int level);
 
 /* Convert a lua table into a message pack list. */
-static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
+static void mp_encode_lua_table_as_array(lua_State *L, luaL_Buffer *buf, int level) {
     size_t len = lua_objlen(L,-1), j;
 
+    lua_insert(L, -buf->lvl - 1);
     mp_encode_array(buf,len);
     for (j = 1; j <= len; j++) {
         lua_pushnumber(L,j);
-        lua_gettable(L,-2);
+        lua_gettable(L,-buf->lvl - 2);
         mp_encode_lua_type(L,buf,level+1);
     }
+    lua_remove(L, -buf->lvl - 1);
 }
 
 /* Convert a lua table into a message pack key-value map. */
-static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
+static void mp_encode_lua_table_as_map(lua_State *L, luaL_Buffer *buf, int level) {
     size_t len = 0;
 
     /* First step: count keys into table. No other way to do it with the
@@ -353,14 +315,16 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
     }
 
     /* Step two: actually encoding of the map. */
+    lua_insert(L, -buf->lvl - 1);
     mp_encode_map(buf,len);
     lua_pushnil(L);
-    while(lua_next(L,-2)) {
+    while(lua_next(L,-buf->lvl - 2)) {
         /* Stack: ... key value */
         lua_pushvalue(L,-2); /* Stack: ... key value key */
         mp_encode_lua_type(L,buf,level+1); /* encode key */
         mp_encode_lua_type(L,buf,level+1); /* encode val */
     }
+    lua_remove(L, -buf->lvl - 1);
 }
 
 /* Returns true if the Lua table on top of the stack is exclusively composed
@@ -396,21 +360,19 @@ not_array:
 /* If the length operator returns non-zero, that is, there is at least
  * an object at key '1', we serialize to message pack list. Otherwise
  * we use a map. */
-static void mp_encode_lua_table(lua_State *L, mp_buf *buf, int level) {
+static void mp_encode_lua_table(lua_State *L, luaL_Buffer *buf, int level) {
     if (table_is_an_array(L))
         mp_encode_lua_table_as_array(L,buf,level);
     else
         mp_encode_lua_table_as_map(L,buf,level);
 }
 
-static void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
-    unsigned char b[1];
-
-    b[0] = 0xc0;
-    mp_buf_append(buf,b,1);
+static void mp_encode_lua_null(lua_State *L, luaL_Buffer *buf) {
+    luaL_addchar(buf, 0xC0);
+    lua_pop(L,1);
 }
 
-static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
+static void mp_encode_lua_type(lua_State *L, luaL_Buffer *buf, int level) {
     int t = lua_type(L,-1);
 
     /* Limit the encoding of nested tables to a specfiied maximum depth, so that
@@ -423,15 +385,14 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     case LUA_TTABLE: mp_encode_lua_table(L,buf,level); break;
     default: mp_encode_lua_null(L,buf); break;
     }
-    lua_pop(L,1);
 }
 
 static int mp_pack(lua_State *L) {
-    mp_buf *buf = mp_buf_new();
+    luaL_Buffer buf;
+    luaL_buffinit(L, &buf);
 
-    mp_encode_lua_type(L,buf,0);
-    lua_pushlstring(L,(char*)buf->b,buf->len);
-    mp_buf_free(buf);
+    mp_encode_lua_type(L,&buf,0);
+    luaL_pushresult(&buf);  /* close buffer */
     return 1;
 }
 
@@ -657,7 +618,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
 static int mp_unpack(lua_State *L) {
     size_t len;
     const unsigned char *s;
-    mp_cur *c;
+    mp_cur c;
 
     if (!lua_isstring(L,-1)) {
         lua_pushstring(L,"MessagePack decoding needs a string as input.");
@@ -665,23 +626,19 @@ static int mp_unpack(lua_State *L) {
     }
 
     s = (const unsigned char*) lua_tolstring(L,-1,&len);
-    c = mp_cur_new(s,len);
-    mp_decode_to_lua_type(L,c);
-    
-    if (c->err == MP_CUR_ERROR_EOF) {
-        mp_cur_free(c);
+    mp_cur_init(&c, s,len);
+    mp_decode_to_lua_type(L,&c);
+
+    if (c.err == MP_CUR_ERROR_EOF) {
         lua_pushstring(L,"Missing bytes in input.");
         lua_error(L);
-    } else if (c->err == MP_CUR_ERROR_BADFMT) {
-        mp_cur_free(c);
+    } else if (c.err == MP_CUR_ERROR_BADFMT) {
         lua_pushstring(L,"Bad data format in input.");
         lua_error(L);
-    } else if (c->left != 0) {
-        mp_cur_free(c);
+    } else if (c.left != 0) {
         lua_pushstring(L,"Extra bytes in input.");
         lua_error(L);
     }
-    mp_cur_free(c);
     return 1;
 }
 
