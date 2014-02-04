@@ -1,9 +1,50 @@
+require "cmsgpack"
 -- lua_cmsgpack.c lib tests
 -- Copyright(C) 2012 Salvatore Sanfilippo, All Rights Reserved.
 -- See the copyright notice at the end of lua_cmsgpack.c for more information.
 
 passed = 0
-failed = 0 
+failed = 0
+
+local Chars = {}
+for Loop = 0, 255 do
+   Chars[Loop+1] = string.char(Loop)
+end
+local String = table.concat(Chars)
+
+local Built = {['.'] = Chars}
+
+local AddLookup = function(CharSet)
+   local Substitute = string.gsub(String, '[^'..CharSet..']', '')
+   local Lookup = {}
+   for Loop = 1, string.len(Substitute) do
+       Lookup[Loop] = string.sub(Substitute, Loop, Loop)
+   end
+   Built[CharSet] = Lookup
+
+   return Lookup
+end
+
+function string.random(Length, CharSet)
+   -- Length (number)
+   -- CharSet (string, optional); e.g. %l%d for lower case letters and digits
+
+   local CharSet = CharSet or '.'
+
+   if CharSet == '' then
+      return ''
+   else
+      local Result = {}
+      local Lookup = Built[CharSet] or AddLookup(CharSet)
+      local Range = table.getn(Lookup)
+
+      for Loop = 1,Length do
+         Result[Loop] = Lookup[math.random(1, Range)]
+      end
+
+      return table.concat(Result)
+   end
+end
 
 function hex(s)
     local i
@@ -117,7 +158,46 @@ test_circular("string16","xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 test_circular("fix array (1)",{1,2,3,"foo"})
 test_circular("fix array (2)",{})
 test_circular("fix array (3)",{1,{},{}})
-test_circular("fix map",{a=5,b=10,c="string"})
+
+gap_array = {1,2,3,4}
+gap_array[7] = 2
+test_circular("fix array (4)", gap_array)
+
+test_circular("fix map (1)",{a=5,b=10,c="string"})
+
+hash_num = 5
+arrary_num = 1000000
+large_table = {}
+for i = 1, hash_num do
+    large_table[string.random(5, "%l%d%u")] = i
+end
+for i = 1, arrary_num do
+    large_table[i] = i + 10000000
+end
+test_circular("fix large map (2)", large_table)
+
+gap_hash = {1,2,3,4}
+gap_hash[7] = 2
+gap_hash["hello"] = 4
+test_circular("fix map(3)", gap_array)
+
+hash_num = 5
+arrary_num = 65530
+medium_table = {}
+for i = 1, hash_num do
+    medium_table[string.random(5, "%l%d%u")] = i
+end
+for i = 1, arrary_num do
+    medium_table[i] = i + 10000000
+end
+test_circular("fix large map (4)", medium_table)
+
+arrary_num = 1000000
+large_array = {}
+for i = 1, arrary_num do
+    large_array[i] = i + 10000000
+end
+test_circular("large array", large_array)
 
 -- The following test vectors are taken from the Javascript lib at:
 -- https://github.com/cuzic/MessagePack-JS/blob/master/test/test_pack.html
@@ -142,11 +222,19 @@ test_pack_and_unpack("raw16","                                        ","da00282
 test_pack_and_unpack("array 16",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},"dc001000000000000000000000000000000000")
 
 -- Regression test for issue #4, cyclic references in tables.
-a = {x=nil,y=5}
-b = {x=a}
-a['x'] = b
-pack = cmsgpack.pack(a)
-test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
+function cyclic_refer_test()
+    a = {x=nil,y=5}
+    b = {x=a}
+    a['x'] = b
+    cmsgpack.pack(a)
+end
+
+if pcall(cyclic_refer_test) then
+    print "FAILED: exception no throw"
+else
+    print "Testing max nesting ...ok"
+end
+-- test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
 
 -- Final report
 print()

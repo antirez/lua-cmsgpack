@@ -11,7 +11,7 @@
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
-#define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
+#define LUACMSGPACK_MAX_NESTING  9 /* Max tables nesting. */
 
 /* ==============================================================================
  * MessagePack implementation and bindings for Lua 5.1.
@@ -69,7 +69,7 @@ typedef struct mp_buf {
 
 static mp_buf *mp_buf_new(void) {
     mp_buf *buf = malloc(sizeof(*buf));
-    
+
     buf->b = NULL;
     buf->len = buf->free = 0;
     return buf;
@@ -367,26 +367,24 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx = 0;
+    long idx = 0;
     lua_Number n;
 
     lua_pushnil(L);
     while(lua_next(L,-2)) {
+        idx++;
         /* Stack: ... key value */
         lua_pop(L,1); /* Stack: ... key */
         if (lua_type(L,-1) != LUA_TNUMBER) goto not_array;
         n = lua_tonumber(L,-1);
-        idx = n;
         if (idx != n || idx < 1) goto not_array;
-        count++;
-        max = idx;
     }
     /* We have the total number of elements in "count". Also we have
      * the max index encountered in "idx". We can't reach this code
      * if there are indexes <= 0. If you also note that there can not be
      * repeated keys into a table, you have that if idx==count you are sure
      * that there are all the keys form 1 to count (both included). */
-    return idx == count;
+    return 1;
 
 not_array:
     lua_pop(L,1);
@@ -415,7 +413,12 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
 
     /* Limit the encoding of nested tables to a specfiied maximum depth, so that
      * we survive when called against circular references in tables. */
-    if (t == LUA_TTABLE && level == LUACMSGPACK_MAX_NESTING) t = LUA_TNIL;
+    if (t == LUA_TTABLE && level == LUACMSGPACK_MAX_NESTING) {
+        t = LUA_TNIL;
+        lua_pushliteral(L, "table nesting level too deep");
+        lua_error(L);
+    }
+
     switch(t) {
     case LUA_TSTRING: mp_encode_lua_string(L,buf); break;
     case LUA_TBOOLEAN: mp_encode_lua_bool(L,buf); break;
@@ -437,12 +440,128 @@ static int mp_pack(lua_State *L) {
 
 /* --------------------------------- Decoding --------------------------------- */
 
+unsigned int next_power_of_two(int n) {
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
+
+int calc_array_num(mp_cur *c, size_t len) {
+    const unsigned char *curr = c->p;
+    size_t left = c->left;
+    int narray = 0;
+    int i;
+    int idx = 0;
+    int value;
+    for (i = 0;  i < len * 2; i++) {
+        switch (curr[0]) {
+        case 0xcc:  /* uint 8 */
+        case 0xd0:  /* int 8 */
+            if (i % 2 == 0) {
+                idx++;
+                if (left < 2) {
+                    return narray;
+                }
+
+                if (idx == curr[1] || curr[1] <= next_power_of_two(idx))
+                    narray++;
+                else
+                    return narray;
+            }
+            curr += 2;
+            left -=2;
+            break;
+        case 0xcd:  /* uint 16 */
+        case 0xd1:  /* int 16 */
+            if (i % 2 == 0) {
+                idx++;
+                if (left < 3) {
+                    return narray;
+                }
+                value = (curr[1] << 8) | curr[2];
+                if (idx == value || value <= next_power_of_two(idx))
+                    narray++;
+                else
+                    return narray;
+            }
+            curr += 3;
+            left -= 3;
+            break;
+        case 0xce:  /* uint 32 */
+        case 0xd2:  /* int 32 */
+            if (i % 2 == 0) {
+                idx++;
+                if (left < 5) {
+                    return narray;
+                }
+                value = ((uint32_t)curr[1] << 24) |
+                        ((uint32_t)curr[2] << 16) |
+                        ((uint32_t)curr[3] << 8) |
+                         (uint32_t)curr[4];
+                if (idx == value || value <= next_power_of_two(idx))
+                    narray++;
+                else
+                    return narray;
+            }
+            curr += 5;
+            left -= 5;
+            break;
+        case 0xcf:  /* uint 64 */
+        case 0xd3:  /* int 64 */
+            if (i % 2 == 0) {
+                idx++;
+                if (left < 9) {
+                    return narray;
+                }
+
+                value = ((uint64_t)curr[1] << 56) |
+                        ((uint64_t)curr[2] << 48) |
+                        ((uint64_t)curr[3] << 40) |
+                        ((uint64_t)curr[4] << 32) |
+                        ((uint64_t)curr[5] << 24) |
+                        ((uint64_t)curr[6] << 16) |
+                        ((uint64_t)curr[7] << 8)  |
+                         (uint64_t)curr[8];
+                if (idx == value || value <= next_power_of_two(idx))
+                    narray++;
+                else
+                    return narray;
+            }
+            curr += 9;
+            left -= 9;
+            break;
+         default:    /* types that can't be idenitified by first byte value. */
+            if ((curr[0] & 0x80) == 0) {   /* positive fixnum */
+                if (i % 2 == 0) {
+                    idx++;
+                    if (idx == curr[0] || curr[0] <= next_power_of_two(idx)) {
+                        narray++;
+                    } else {
+                        return narray;
+                    }
+                }
+                curr += 1;
+                left -= 1;
+
+            } else {  /* other */
+                return narray;
+            }
+        }
+    }
+    return narray;
+}
+
 void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
 
 void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
     int index = 1;
-
-    lua_newtable(L);
+    /*lua_newtable(L);*/
+    lua_createtable(L, len, 0);
     while(len--) {
         lua_pushnumber(L,index++);
         mp_decode_to_lua_type(L,c);
@@ -452,7 +571,12 @@ void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
 }
 
 void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
-    lua_newtable(L);
+    int narray;
+    int nhash;
+    narray = calc_array_num(c, len);
+    nhash = len - narray;
+    lua_createtable(L, narray, nhash);
+    /*lua_newtable(L);*/
     while(len--) {
         mp_decode_to_lua_type(L,c); /* key */
         if (c->err) return;
@@ -667,7 +791,7 @@ static int mp_unpack(lua_State *L) {
     s = (const unsigned char*) lua_tolstring(L,-1,&len);
     c = mp_cur_new(s,len);
     mp_decode_to_lua_type(L,c);
-    
+
     if (c->err == MP_CUR_ERROR_EOF) {
         mp_cur_free(c);
         lua_pushstring(L,"Missing bytes in input.");
@@ -701,7 +825,7 @@ LUALIB_API int luaopen_cmsgpack (lua_State *L) {
     lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
     lua_setfield(L, -2, "_COPYRIGHT");
     lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
-    lua_setfield(L, -2, "_DESCRIPTION"); 
+    lua_setfield(L, -2, "_DESCRIPTION");
     return 1;
 }
 
