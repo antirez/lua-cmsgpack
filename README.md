@@ -1,11 +1,10 @@
-README for lua_cmsgpack.c
+README for lua-cmsgpack.c
 ===
 
-Lua-cmsgpack is a MessagePack (http://msgpack.org) implementation and bindings for
+Lua-cmsgpack is a [MessagePack](http://msgpack.org) implementation and bindings for
 Lua 5.1/5.2 in a self contained C file without external dependencies.
 
 This library is open source software licensed under the BSD two-clause license.
-The library is currently considered in BETA STAGE for lack of extensive testing.
 
 INSTALLATION
 ---
@@ -26,7 +25,7 @@ Using LuaRocks (http://luarocks.org):
     sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec
 
 If you embed Lua and all modules into your C project, just add the
-lua_cmsgpack.c file and call the following function after creating the Lua
+`lua_cmsgpack.c` file and call the following function after creating the Lua
 interpreter:
 
     luaopen_cmsgpack(L);
@@ -36,8 +35,8 @@ USAGE
 
 The exported API is very simple, consisting in two functions:
 
-* msgpack = cmsgpack.pack(lua_object)
-* lua_object = cmsgpack.unpack(msgpack)
+    msgpack = cmsgpack.pack(lua_object)
+    lua_object = cmsgpack.unpack(msgpack)
 
 However because of the nature of Lua numerical and table type a few behavior
 of the library must be well understood to avoid problems:
@@ -53,7 +52,7 @@ maps.
 
 NESTED TABLES
 ---
-Nested tables are handled correctly up to LUACMSGPACK_MAX_NESTING levels of
+Nested tables are handled correctly up to `LUACMSGPACK_MAX_NESTING` levels of
 nesting (that is set to 16 by default).
 Every table that is nested at a greater level than the maxium is encoded
 as MessagePack nil value.
@@ -61,9 +60,9 @@ as MessagePack nil value.
 It is worth to note that in Lua it is possible to create tables that mutually
 refer to each other, creating a cycle. For example:
 
-a = {x=nil,y=5}
-b = {x=a}
-a['x'] = b
+    a = {x=nil,y=5}
+    b = {x=a}
+    a['x'] = b
 
 This condition will simply make the encoder reach the max level of nesting,
 thus avoiding an infinite loop.
@@ -73,4 +72,4 @@ CREDITS
 
 This library was written by Salvatore Sanfilippo for Redis, but is maintained as a separated project by the author.
 
-Some of the test vectors in "test.lua" are obtained from the Javascript MessagePack-JS library (https://github.com/cuzic/MessagePack-JS).
+Some of the test vectors in "test.lua" are obtained from the Javascript [MessagePack-JS library](https://github.com/cuzic/MessagePack-JS).
