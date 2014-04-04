@@ -7,7 +7,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.0"
+#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.1"
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
@@ -29,6 +29,7 @@
  * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
  * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
  * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
+ * 04-Apr-2014 (ver 0.3.1): Lua 5.2 support and minor bug fix.
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
