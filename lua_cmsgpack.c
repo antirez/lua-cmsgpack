@@ -7,7 +7,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.0"
+#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.1"
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
@@ -29,6 +29,7 @@
  * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
  * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
  * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
+ * 04-Apr-2014 (ver 0.3.1): Lua 5.2 support and minor bug fix.
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
@@ -328,10 +329,10 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
 
 /* Convert a lua table into a message pack list. */
 static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
-#if LUA_VERSION_NUM == 502
-    size_t len = lua_rawlen(L,-1), j;
-#else
+#if LUA_VERSION_NUM < 502
     size_t len = lua_objlen(L,-1), j;
+#else
+    size_t len = lua_rawlen(L,-1), j;
 #endif
 
     mp_encode_array(buf,len);
@@ -371,7 +372,7 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx = 0;
+    long count = 0, idx = 0;
     lua_Number n;
 
     lua_pushnil(L);
@@ -383,7 +384,6 @@ static int table_is_an_array(lua_State *L) {
         idx = n;
         if (idx != n || idx < 1) goto not_array;
         count++;
-        max = idx;
     }
     /* We have the total number of elements in "count". Also we have
      * the max index encountered in "idx". We can't reach this code
@@ -684,17 +684,18 @@ static int mp_unpack(lua_State *L) {
         mp_cur_free(c);
         lua_pushstring(L,"Extra bytes in input.");
         lua_error(L);
+    } else {
+        mp_cur_free(c);
     }
-    mp_cur_free(c);
     return 1;
 }
 
 /* ---------------------------------------------------------------------------- */
 
-#if LUA_VERSION_NUM == 502
-static const struct luaL_Reg thislib[] = {
-#else
+#if LUA_VERSION_NUM < 502
 static const struct luaL_reg thislib[] = {
+#else
+static const struct luaL_Reg thislib[] = {
 #endif
     {"pack", mp_pack},
     {"unpack", mp_unpack},
@@ -702,10 +703,10 @@ static const struct luaL_reg thislib[] = {
 };
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
-#if LUA_VERSION_NUM == 502
-    luaL_newlib(L, thislib);
-#else
+#if LUA_VERSION_NUM < 502
     luaL_register(L, "cmsgpack", thislib);
+#else
+    luaL_newlib(L, thislib);
 #endif
 
     lua_pushliteral(L, LUACMSGPACK_VERSION);
