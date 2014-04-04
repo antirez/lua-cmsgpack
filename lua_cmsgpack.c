@@ -328,10 +328,10 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
 
 /* Convert a lua table into a message pack list. */
 static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
-#if LUA_VERSION_NUM == 502
-    size_t len = lua_rawlen(L,-1), j;
-#else
+#if LUA_VERSION_NUM < 502
     size_t len = lua_objlen(L,-1), j;
+#else
+    size_t len = lua_rawlen(L,-1), j;
 #endif
 
     mp_encode_array(buf,len);
@@ -691,10 +691,10 @@ static int mp_unpack(lua_State *L) {
 
 /* ---------------------------------------------------------------------------- */
 
-#if LUA_VERSION_NUM == 502
-static const struct luaL_Reg thislib[] = {
-#else
+#if LUA_VERSION_NUM < 502
 static const struct luaL_reg thislib[] = {
+#else
+static const struct luaL_Reg thislib[] = {
 #endif
     {"pack", mp_pack},
     {"unpack", mp_unpack},
@@ -702,10 +702,10 @@ static const struct luaL_reg thislib[] = {
 };
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
-#if LUA_VERSION_NUM == 502
-    luaL_newlib(L, thislib);
-#else
+#if LUA_VERSION_NUM < 502
     luaL_register(L, "cmsgpack", thislib);
+#else
+    luaL_newlib(L, thislib);
 #endif
 
     lua_pushliteral(L, LUACMSGPACK_VERSION);
