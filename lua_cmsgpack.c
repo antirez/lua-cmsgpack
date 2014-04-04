@@ -683,8 +683,9 @@ static int mp_unpack(lua_State *L) {
         mp_cur_free(c);
         lua_pushstring(L,"Extra bytes in input.");
         lua_error(L);
+    } else {
+        mp_cur_free(c);
     }
-    mp_cur_free(c);
     return 1;
 }
 
