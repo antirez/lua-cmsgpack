@@ -336,11 +336,20 @@ static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
     mp_buf_append(buf,&b,1);
 }
 
+/* Lua 5.3 has a built in 64-bit integer type */
+static void mp_encode_lua_integer(lua_State *L, mp_buf *buf) {
+    lua_Integer i = lua_tointeger(L,-1);
+    mp_encode_int(buf, (int64_t)i);
+}
+
+/* Lua 5.2 and lower only has 64-bit doubles, so we need to
+ * detect if the double may be representable as an int
+ * for Lua < 5.3 */
 static void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
     if (IS_INT64_EQUIVALENT(n)) {
-        mp_encode_int(buf,(int64_t)n);
+        mp_encode_lua_integer(L, buf);
     } else {
         mp_encode_double(buf,(double)n);
     }
@@ -394,7 +403,11 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
     int count = 0, max = 0;
+#if LUA_VERSION_NUM < 503
     lua_Number n;
+#else
+    lua_Integer n;
+#endif
 
     /* Stack top on function entry */
     int stacktop;
@@ -405,8 +418,13 @@ static int table_is_an_array(lua_State *L) {
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
         lua_pop(L,1); /* Stack: ... key */
+        /* The <= 0 check is valid here because we're comparing indexes. */
+#if LUA_VERSION_NUM < 503
         if (!lua_isnumber(L,-1) || (n = lua_tonumber(L, -1)) <= 0 ||
             !IS_INT_EQUIVALENT(n)) {
+#else
+        if (!lua_isinteger(L,-1) || (n = lua_tointeger(L, -1)) <= 0) {
+#endif
             lua_settop(L, stacktop);
             return 0;
         }
@@ -449,7 +467,17 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     switch(t) {
     case LUA_TSTRING: mp_encode_lua_string(L,buf); break;
     case LUA_TBOOLEAN: mp_encode_lua_bool(L,buf); break;
-    case LUA_TNUMBER: mp_encode_lua_number(L,buf); break;
+    case LUA_TNUMBER:
+    #if LUA_VERSION_NUM < 503
+        mp_encode_lua_number(L,buf); break;
+    #else
+        if (lua_isinteger(L, -1)) {
+            mp_encode_lua_integer(L, buf);
+        } else {
+            mp_encode_lua_number(L, buf);
+        }
+        break;
+    #endif
     case LUA_TTABLE: mp_encode_lua_table(L,buf,level); break;
     default: mp_encode_lua_null(L,buf); break;
     }
