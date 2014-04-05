@@ -32,7 +32,7 @@
 #define IS_INT64_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int64_t)
 #define IS_INT_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int)
 
-/* ==============================================================================
+/* =============================================================================
  * MessagePack implementation and bindings for Lua 5.1/5.2.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
  *
@@ -49,16 +49,16 @@
  * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
  * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
  * 04-Apr-2014 (ver 0.3.1): Lua 5.2 support and minor bug fix.
- * ============================================================================ */
+ * ========================================================================== */
 
-/* --------------------------- Endian conversion --------------------------------
- * We use it only for floats and doubles, all the other conversions are performed
+/* -------------------------- Endian conversion --------------------------------
+ * We use it only for floats and doubles, all the other conversions performed
  * in an endian independent fashion. So the only thing we need is a function
- * that swaps a binary string if the arch is little endian (and left it untouched
+ * that swaps a binary string if arch is little endian (and left it untouched
  * otherwise). */
 
 /* Reverse memory bytes if arch is little endian. Given the conceptual
- * simplicity of the Lua build system we prefer to check for endianess at runtime.
+ * simplicity of the Lua build system we prefer check for endianess at runtime.
  * The performance difference should be acceptable. */
 static void memrevifle(void *ptr, size_t len) {
     unsigned char   *p = (unsigned char *)ptr,
@@ -78,7 +78,7 @@ static void memrevifle(void *ptr, size_t len) {
     }
 }
 
-/* ----------------------------- String buffer ----------------------------------
+/* ---------------------------- String buffer ----------------------------------
  * This is a simple implementation of string buffers. The only opereation
  * supported is creating empty buffers and appending bytes to it.
  * The string buffer uses 2x preallocation on every realloc for O(N) append
@@ -91,7 +91,7 @@ typedef struct mp_buf {
 
 static mp_buf *mp_buf_new(void) {
     mp_buf *buf = (mp_buf*)malloc(sizeof(*buf));
-    
+
     buf->b = NULL;
     buf->len = buf->free = 0;
     return buf;
@@ -114,7 +114,7 @@ void mp_buf_free(mp_buf *buf) {
     free(buf);
 }
 
-/* ------------------------------ String cursor ----------------------------------
+/* ---------------------------- String cursor ----------------------------------
  * This simple data structure is used for parsing. Basically you create a cursor
  * using a string pointer and a length, then it is possible to access the
  * current string position with cursor->p, check the remaining length
@@ -124,7 +124,7 @@ void mp_buf_free(mp_buf *buf) {
  * be used to report errors. */
 
 #define MP_CUR_ERROR_NONE   0
-#define MP_CUR_ERROR_EOF    1   /* Not enough data to complete the opereation. */
+#define MP_CUR_ERROR_EOF    1   /* Not enough data to complete opereation. */
 #define MP_CUR_ERROR_BADFMT 2   /* Bad data format */
 
 typedef struct mp_cur {
@@ -158,7 +158,7 @@ static void mp_cur_free(mp_cur *cursor) {
     } \
 } while(0)
 
-/* --------------------------- Low level MP encoding -------------------------- */
+/* ------------------------- Low level MP encoding -------------------------- */
 
 static void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
     unsigned char hdr[5];
@@ -321,7 +321,7 @@ static void mp_encode_map(mp_buf *buf, int64_t n) {
     mp_buf_append(buf,b,enclen);
 }
 
-/* ----------------------------- Lua types encoding --------------------------- */
+/* --------------------------- Lua types encoding --------------------------- */
 
 static void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
     size_t len;
@@ -509,13 +509,13 @@ static int mp_pack(lua_State *L) {
         lua_pushlstring(L,(char*)buf->b,buf->len);
         mp_buf_free(buf);
     }
-   
+
     /* Concatenate all nargs buffers together */
     lua_concat(L, nargs);
     return 1;
 }
 
-/* --------------------------------- Decoding --------------------------------- */
+/* ------------------------------- Decoding --------------------------------- */
 
 void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
 
@@ -749,7 +749,7 @@ static int mp_unpack(lua_State *L) {
      * of multiple top-level values serialized together */
     for(cnt = 0; c->left > 0; cnt++) {
         mp_decode_to_lua_type(L,c);
-        
+
         if (c->err == MP_CUR_ERROR_EOF) {
             mp_cur_free(c);
             return luaL_error(L,"Missing bytes in input.");
@@ -758,7 +758,7 @@ static int mp_unpack(lua_State *L) {
             return luaL_error(L,"Bad data format in input.");
         }
     }
-    
+
     mp_cur_free(c);
     return cnt;
 }
@@ -785,7 +785,7 @@ static int mp_safe(lua_State *L) {
     }
 }
 
-/* ---------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 int luaopen_create(lua_State *L) {
     /* Manually construct our module table instead of
      * relying on _register or _newlib */
@@ -807,7 +807,7 @@ int luaopen_create(lua_State *L) {
     lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
     lua_setfield(L, -2, "_COPYRIGHT");
     lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
-    lua_setfield(L, -2, "_DESCRIPTION"); 
+    lua_setfield(L, -2, "_DESCRIPTION");
     return 1;
 }
 
