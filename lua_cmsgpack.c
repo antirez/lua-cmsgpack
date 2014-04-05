@@ -7,6 +7,8 @@
 #include "lua.h"
 #include "lauxlib.h"
 
+#define LUACMSGPACK_NAME        "cmsgpack"
+#define LUACMSGPACK_SAFE_NAME   "cmsgpack_safe"
 #define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.1"
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
@@ -455,17 +457,15 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
 }
 
 /*
- * Packs all arguments as a stream.
- * Returns the empty string if no argument was given.
+ * Packs all arguments as a stream for multiple upacking later.
+ * Returns error if no arguments provided.
  */
 static int mp_pack(lua_State *L) {
     int nargs = lua_gettop(L);
     int i;
 
-    if (nargs == 0) {
-        lua_pushliteral(L, "");
-        return 1;
-    }
+    if (nargs == 0)
+        return luaL_argerror(L, 0, "MessagePack pack needs input.");
 
     /* Create nargs packed buffers */
     for(i = 1; i <= nargs; i++) {
@@ -713,28 +713,22 @@ static int mp_unpack(lua_State *L) {
     mp_cur *c;
     int cnt; /* Number of objects unpacked */
 
-    if (!lua_isstring(L,-1)) {
-        lua_pushstring(L,"MessagePack decoding needs a string as input.");
-        lua_error(L);
-    }
+    if ((s = (unsigned char*)luaL_checklstring(L,1,&len)) == NULL)
+        return luaL_argerror(L,1,"MessagePack decoding requires string input.");
 
-    s = (const unsigned char*) lua_tolstring(L,-1,&len);
     c = mp_cur_new(s,len);
 
-    /* We loop over the decode because this could be a stream */
+    /* We loop over the decode because this could be a stream
+     * of multiple top-level values serialized together */
     for(cnt = 0; c->left > 0; cnt++) {
         mp_decode_to_lua_type(L,c);
         
         if (c->err == MP_CUR_ERROR_EOF) {
             mp_cur_free(c);
-            c = NULL;
-            lua_pushstring(L,"Missing bytes in input.");
-            lua_error(L);
+            return luaL_error(L,"Missing bytes in input.");
         } else if (c->err == MP_CUR_ERROR_BADFMT) {
             mp_cur_free(c);
-            c = NULL;
-            lua_pushstring(L,"Bad data format in input.");
-            lua_error(L);
+            return luaL_error(L,"Bad data format in input.");
         }
     }
     
@@ -742,31 +736,85 @@ static int mp_unpack(lua_State *L) {
     return cnt;
 }
 
+static int mp_safe(lua_State *L) {
+    int argc, err, total_results;
+
+    argc = lua_gettop(L);
+
+    /* This adds our function to the bottom of the stack
+     * (the "call this function" position) */
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_insert(L, 1);
+
+    err = lua_pcall(L, argc, LUA_MULTRET, 0);
+    total_results = lua_gettop(L);
+
+    if (!err) {
+        return total_results;
+    } else {
+        lua_pushnil(L);
+        lua_insert(L,-2);
+        return 2;
+    }
+}
+
 /* ---------------------------------------------------------------------------- */
+int luaopen_create(lua_State *L) {
+    /* Manually construct our module table instead of
+     * relying on _register or _newlib */
+    lua_newtable(L);
 
-#if LUA_VERSION_NUM < 502
-static const struct luaL_reg thislib[] = {
-#else
-static const struct luaL_Reg thislib[] = {
-#endif
-    {"pack", mp_pack},
-    {"unpack", mp_unpack},
-    {NULL, NULL}
-};
+    /* Add unpack function */
+    lua_pushcfunction(L, mp_unpack);
+    lua_setfield(L, -2, "unpack");
 
-LUALIB_API int luaopen_cmsgpack (lua_State *L) {
-#if LUA_VERSION_NUM < 502
-    luaL_register(L, "cmsgpack", thislib);
-#else
-    luaL_newlib(L, thislib);
-#endif
+    /* Add pack function */
+    lua_pushcfunction(L, mp_pack);
+    lua_setfield(L, -2, "pack");
 
+    /* Add metadata */
+    lua_pushliteral(L, LUACMSGPACK_NAME);
+    lua_setfield(L, -2, "_NAME");
     lua_pushliteral(L, LUACMSGPACK_VERSION);
     lua_setfield(L, -2, "_VERSION");
     lua_pushliteral(L, LUACMSGPACK_COPYRIGHT);
     lua_setfield(L, -2, "_COPYRIGHT");
     lua_pushliteral(L, LUACMSGPACK_DESCRIPTION);
     lua_setfield(L, -2, "_DESCRIPTION"); 
+    return 1;
+}
+
+LUALIB_API int luaopen_cmsgpack(lua_State *L) {
+    luaopen_create(L);
+
+#if LUA_VERSION_NUM < 502
+    /* Register name globally for 5.1 */
+    lua_pushvalue(L, -1);
+    lua_setglobal(L, LUACMSGPACK_NAME);
+#endif
+
+    return 1;
+}
+
+LUALIB_API int luaopen_cmsgpack_safe(lua_State *L) {
+    luaopen_cmsgpack(L);
+
+    /* Add safe wrapper to pack */
+    lua_getfield(L, -1, "pack");
+    lua_pushcclosure(L, mp_safe, 1);
+    lua_setfield(L, -2, "pack");
+
+    /* Add safe wrapper to unpack */
+    lua_getfield(L, -1, "unpack");
+    lua_pushcclosure(L, mp_safe, 1);
+    lua_setfield(L, -2, "unpack");
+
+#if LUA_VERSION_NUM < 502
+    /* Register name globally for 5.1 */
+    lua_pushvalue(L, -1);
+    lua_setglobal(L, LUACMSGPACK_SAFE_NAME);
+#endif
+
     return 1;
 }
 
