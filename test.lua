@@ -3,9 +3,12 @@
 -- See the copyright notice at the end of lua_cmsgpack.c for more information.
 
 local cmsgpack = require "cmsgpack"
+local ok, cmsgpack_safe = pcall(require, 'cmsgpack.safe')
+if not ok then cmsgpack_safe = nil end
 
 passed = 0
 failed = 0 
+skipped = 0
 
 function hex(s)
     local i
@@ -40,11 +43,57 @@ function unhex(h)
     return s
 end
 
-function compare_objects(a,b)
+function test_error(name, fn)
+    io.write("Testing generate error '",name,"' ...")
+    local ok, ret, err = pcall(fn)
+    -- 'ok' is an error because we are testing for expicit *failure*
+    if ok then
+        print("ERROR: result ", ret, err)
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+local function test_multiple(name, ...)
+    io.write("Multiple test '",name,"' ...")
+    if not compare_objects({...},{cmsgpack.unpack(cmsgpack.pack(...))}) then
+        print("ERROR:", {...}, cmsgpack.unpack(cmsgpack.pack(...)))
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+function test_noerror(name, fn)
+    io.write("Testing safe calling '",name,"' ...")
+    if not cmsgpack_safe then
+        print("skip: no `cmsgpack.safe` module")
+        skipped = skipped + 1
+        return
+    end
+    local ok, ret, err = pcall(fn)
+    if not ok then
+        print("ERROR: result ", ret, err)
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+function compare_objects(a,b,depth)
     if (type(a) == "table") then
         local count = 0
+        if not depth then
+            depth = 1
+        elseif depth == 10 then
+            return true  -- assume if match down 10 levels, the rest is okay too
+        end
         for k,v in pairs(a) do
-            if not compare_objects(b[k],v) then return false end
+            if not compare_objects(b[k],v, depth + 1) then return false end
             count = count + 1
         end
         -- All the 'a' keys are equal to their 'b' equivalents.
@@ -65,6 +114,45 @@ function test_circular(name,obj)
         print("ok")
         passed = passed+1
     end
+end
+
+function test_stream(mod, name, ...)
+    io.write("Stream test '", name, "' ...")
+    if not mod then
+        print("skip: no `cmsgpack.safe` module")
+        skipped = skipped + 1
+        return
+    end
+    local argc = select('#', ...)
+    for i=1, argc do
+        test_circular(name, select(i, ...))
+    end
+    local ret = {mod.unpack(mod.pack(unpack({...})))}
+    for i=1, argc do
+        local origin = select(i, ...)
+        if (type(origin) == "table") then
+            for k,v in pairs(origin) do
+                local fail = not compare_objects(v, ret[i][k])
+                if fail then
+                    print("ERRORa:", k, v, " not match ", ret[i][k])
+                    failed = failed + 1
+                elseif not fail then
+                    print("ok; matched stream table member")
+                    passed = passed + 1
+                end
+            end
+        else
+            local fail = not compare_objects(origin, ret[i])
+            if fail then
+                print("ERRORc:", origin, " not match ", ret[i])
+                failed = failed + 1
+            elseif not fail then
+                print("ok; matched individual stream member")
+                passed = passed + 1
+            end
+        end
+    end
+
 end
 
 function test_pack(name,obj,raw)
@@ -94,6 +182,54 @@ function test_pack_and_unpack(name,obj,raw)
     test_unpack(name,raw,obj)
 end
 
+local function test_global()
+    io.write("Testing global variable ...")
+
+    if _VERSION == "Lua 5.1" then
+        if not _G.cmsgpack then
+            print("ERROR: Lua 5.1 should set global")
+            failed = failed+1
+        else
+            print("ok")
+            passed = passed+1
+        end
+    else
+        if _G.cmsgpack then
+            print("ERROR: Lua 5.2 should not set global")
+            failed = failed+1
+        else
+            print("ok")
+            passed = passed+1
+        end
+    end
+end
+
+local function test_array()
+    io.write("Testing array detection ...")
+
+    local a = {a1 = 1, a2 = 1, a3 = 1, a4 = 1, a5 = 1, a6 = 1, a7 = 1, a8 = 1, a9 = 1}
+    a[1] = 10 a[2] = 20 a[3] = 30
+    a.a1,a.a2,a.a3,a.a4,a.a5,a.a6,a.a7,a.a8, a.a9 = nil
+
+    local test_obj = {10,20,30}
+    assert(compare_objects(test_obj, a))
+
+    local etalon = cmsgpack.pack(test_obj)
+    local encode = cmsgpack.pack(a)
+
+    if etalon ~= encode then
+        print("ERROR:")
+        print("", "expected: ", hex(etalon))
+        print("", "     got: ", hex(encode))
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
+end
+
+test_global()
+test_array()
 test_circular("positive fixnum",17);
 test_circular("negative fixnum",-1);
 test_circular("true boolean",true);
@@ -151,8 +287,37 @@ b = {x=a}
 a['x'] = b
 pack = cmsgpack.pack(a)
 test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
+test_circular("regression for issue #4",a)
+
+-- Tests from github.com/moteus
+test_circular("map with number keys", {[1] = {1,2,3}})
+test_circular("map with float keys", {[1.5] = {1,2,3}})
+test_error("unpack nil", function() cmsgpack.unpack(nil) end)
+test_error("unpack table", function() cmsgpack.unpack({}) end)
+test_error("unpack udata", function() cmsgpack.unpack(io.stdout) end)
+test_noerror("unpack nil", function() cmsgpack_safe.unpack(nil) end)
+test_noerror("unpack nil", function() cmsgpack_safe.unpack(nil) end)
+test_noerror("unpack table", function() cmsgpack_safe.unpack({}) end)
+test_noerror("unpack udata", function() cmsgpack_safe.unpack(io.stdout) end)
+test_multiple("two ints", 1, 2)
+test_multiple("holes", 1, nil, 2, nil, 4)
+
+-- Streaming/Multi-Input Tests
+test_stream(cmsgpack, "simple", {a=1}, {b=2}, {c=3}, 4, 5, 6, 7)
+test_stream(cmsgpack_safe, "safe simple", {a=1}, {b=2}, {c=3}, 4, 5, 6, 7)
+test_stream(cmsgpack, "oddities", {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, {0}, {a=64}, math.huge, -math.huge)
+test_stream(cmsgpack_safe, "safe oddities", {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, {0}, {a=64}, math.huge, -math.huge)
+test_stream(cmsgpack, "strange things", nil, {}, {nil}, a, b, b, b, a, a, b, {c = a, d = b})
+test_stream(cmsgpack_safe, "strange things", nil, {}, {nil}, a, b, b, b, a, a, b, {c = a, d = b})
+test_error("pack nothing", function() cmsgpack.pack() end)
+test_noerror("pack nothing safe", function() cmsgpack_safe.pack() end)
 
 -- Final report
 print()
 print("TEST PASSED:",passed)
 print("TEST FAILED:",failed)
+print("TEST SKIPPED:",skipped)
+
+if failed > 0 then
+   os.exit(1)
+end
