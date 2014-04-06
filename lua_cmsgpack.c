@@ -32,6 +32,10 @@
 #define IS_INT64_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int64_t)
 #define IS_INT_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int)
 
+#if LUA_VERSION_NUM < 503
+    #define lua_pushunsigned(L, n) lua_pushinteger(L, n)
+#endif
+
 /* =============================================================================
  * MessagePack implementation and bindings for Lua 5.1/5.2.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
@@ -542,31 +546,31 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     switch(c->p[0]) {
     case 0xcc:  /* uint 8 */
         mp_cur_need(c,2);
-        lua_pushnumber(L,c->p[1]);
+        lua_pushunsigned(L,c->p[1]);
         mp_cur_consume(c,2);
         break;
     case 0xd0:  /* int 8 */
         mp_cur_need(c,2);
-        lua_pushnumber(L,(char)c->p[1]);
+        lua_pushinteger(L,(char)c->p[1]);
         mp_cur_consume(c,2);
         break;
     case 0xcd:  /* uint 16 */
         mp_cur_need(c,3);
-        lua_pushnumber(L,
+        lua_pushunsigned(L,
             (c->p[1] << 8) |
              c->p[2]);
         mp_cur_consume(c,3);
         break;
     case 0xd1:  /* int 16 */
         mp_cur_need(c,3);
-        lua_pushnumber(L,(int16_t)
+        lua_pushinteger(L,(int16_t)
             (c->p[1] << 8) |
              c->p[2]);
         mp_cur_consume(c,3);
         break;
     case 0xce:  /* uint 32 */
         mp_cur_need(c,5);
-        lua_pushnumber(L,
+        lua_pushunsigned(L,
             ((uint32_t)c->p[1] << 24) |
             ((uint32_t)c->p[2] << 16) |
             ((uint32_t)c->p[3] << 8) |
@@ -575,7 +579,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
         break;
     case 0xd2:  /* int 32 */
         mp_cur_need(c,5);
-        lua_pushnumber(L,
+        lua_pushinteger(L,
             ((int32_t)c->p[1] << 24) |
             ((int32_t)c->p[2] << 16) |
             ((int32_t)c->p[3] << 8) |
@@ -584,7 +588,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
         break;
     case 0xcf:  /* uint 64 */
         mp_cur_need(c,9);
-        lua_pushnumber(L,
+        lua_pushunsigned(L,
             ((uint64_t)c->p[1] << 56) |
             ((uint64_t)c->p[2] << 48) |
             ((uint64_t)c->p[3] << 40) |
@@ -597,7 +601,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
         break;
     case 0xd3:  /* int 64 */
         mp_cur_need(c,9);
-        lua_pushnumber(L,
+        lua_pushinteger(L,
             ((int64_t)c->p[1] << 56) |
             ((int64_t)c->p[2] << 48) |
             ((int64_t)c->p[3] << 40) |
@@ -703,10 +707,10 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
         break;
     default:    /* types that can't be idenitified by first byte value. */
         if ((c->p[0] & 0x80) == 0) {   /* positive fixnum */
-            lua_pushnumber(L,c->p[0]);
+            lua_pushunsigned(L,c->p[0]);
             mp_cur_consume(c,1);
         } else if ((c->p[0] & 0xe0) == 0xe0) {  /* negative fixnum */
-            lua_pushnumber(L,(signed char)c->p[0]);
+            lua_pushinteger(L,(signed char)c->p[0]);
             mp_cur_consume(c,1);
         } else if ((c->p[0] & 0xe0) == 0xa0) {  /* fix raw */
             size_t l = c->p[0] & 0x1f;
