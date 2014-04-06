@@ -210,9 +210,13 @@ function test_partial_unpack(name, count, ...)
     return pack, unpacked[1]
 end
 
-function test_pack(name,obj,raw)
+function test_pack(name,obj,raw,optraw)
     io.write("Testing encoder '",name,"' ...")
-    if hex(cmsgpack.pack(obj)) ~= raw then
+    local result = hex(cmsgpack.pack(obj))
+    if optraw and (result == optraw) then
+        print("ok")
+        passed = passed + 1
+    elseif result ~= raw then
         print("ERROR:", obj, hex(cmsgpack.pack(obj)), raw)
         failed = failed+1
     else
@@ -359,8 +363,11 @@ a = {x=nil,y=5}
 b = {x=a}
 a['x'] = b
 pack = cmsgpack.pack(a)
-test_pack("regression for issue #4",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0")
-test_circular("regression for issue #4",a)
+-- Note: the generated result isn't stable because the order of traversal for
+-- a table isn't defined. So far we've only noticed two serializations of a
+-- (and the second serialization only happens on Lua 5.3 sometimes)
+test_pack("regression for issue #4 output matching",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0", "82a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a178c0a17905a17905a17905a17905a17905a17905a17905a17905")
+test_circular("regression for issue #4 circular",a)
 
 -- Tests from github.com/moteus
 test_circular("map with number keys", {[1] = {1,2,3}})
