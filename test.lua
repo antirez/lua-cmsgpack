@@ -7,7 +7,7 @@ local ok, cmsgpack_safe = pcall(require, 'cmsgpack.safe')
 if not ok then cmsgpack_safe = nil end
 
 passed = 0
-failed = 0 
+failed = 0
 skipped = 0
 
 function hex(s)
@@ -117,7 +117,7 @@ function test_circular(name,obj)
 end
 
 function test_stream(mod, name, ...)
-    io.write("Stream test '", name, "' ...")
+    io.write("Stream test '", name, "' ...\n")
     if not mod then
         print("skip: no `cmsgpack.safe` module")
         skipped = skipped + 1
@@ -155,6 +155,61 @@ function test_stream(mod, name, ...)
 
 end
 
+function test_partial_unpack(name, count, ...)
+    io.write("Testing partial unpack '",name,"' ...\n")
+    local first = select(1, ...)
+    local pack, unpacked, args, offset, cargs, ok, err
+    if (type(first) == "table") then
+        pack = first.p
+        args = first.remaining
+        offset = first.o
+        cargs = {pack, count, offset}
+    else
+        pack = cmsgpack.pack(unpack({...}))
+        args = {...}
+        cargs = {pack, count}
+    end
+    if offset and offset < 0 then
+        ok, unpacked, err = pcall(function()return {cmsgpack.unpack_limit(unpack(cargs))} end)
+        if not ok then
+            print("ok; received error as expected") --, unpacked)
+            passed = passed + 1
+            return
+        end
+    else
+        unpacked = {cmsgpack.unpack_limit(unpack(cargs))}
+        -- print ("GOT RETURNED:", unpack(unpacked))
+    end
+
+    if count == 0 and #unpacked == 1 then
+        print("ok; received zero decodes as expected")
+        passed = passed + 1
+        return
+    end
+
+    if not (((#unpacked)-1) == count) then
+        print(string.format("ERROR: received %d instead of %d objects:", (#unpacked)-1, count),
+            unpack(select(1, unpacked)))
+        failed = failed + 1
+        return
+    end
+
+    for i=2, #unpacked do
+        local origin = args[i-1]
+        --print("Comparing ", origin, unpacked[i])
+        if not compare_objects(origin, unpacked[i]) then
+            print("ERROR:", origin, " not match ", unpacked[i])
+            failed = failed + 1
+        else
+            print("ok; matched unpacked value to input")
+            passed = passed + 1
+        end
+    end
+
+    -- return the packed value and our continue offset
+    return pack, unpacked[1]
+end
+
 function test_pack(name,obj,raw)
     io.write("Testing encoder '",name,"' ...")
     if hex(cmsgpack.pack(obj)) ~= raw then
@@ -164,6 +219,24 @@ function test_pack(name,obj,raw)
         print("ok")
         passed = passed+1
     end
+end
+
+function test_unpack_one(name, packed, check, offset)
+    io.write("Testing one unpack '",name,"' ...")
+    local unpacked = {cmsgpack.unpack_one(unpack({packed, offset}))}
+
+    if #unpacked > 2 then
+        print("ERROR: unpacked more than one object:", unpack(unpacked))
+        failed = failed + 1
+    elseif not compare_objects(unpacked[2], check) then
+        print("ERROR: unpacked unexpected result:", unpack(unpacked))
+        failed = failed + 1
+    else
+        print("ok") --; unpacked", unpacked[2])
+        passed = passed + 1
+    end
+
+    return unpacked[1]
 end
 
 function test_unpack(name,raw,obj)
@@ -311,6 +384,23 @@ test_stream(cmsgpack, "strange things", nil, {}, {nil}, a, b, b, b, a, a, b, {c 
 test_stream(cmsgpack_safe, "strange things", nil, {}, {nil}, a, b, b, b, a, a, b, {c = a, d = b})
 test_error("pack nothing", function() cmsgpack.pack() end)
 test_noerror("pack nothing safe", function() cmsgpack_safe.pack() end)
+
+-- Test limited streaming
+packed, offset = test_partial_unpack("unpack 1a out of 7", 1, "a", "b", "c", "d", "e", "f", "g")
+packed, offset = test_partial_unpack("unpack 1b of remaining 7", 1, {p=packed,o=offset,remaining={"b"}})
+packed, offset = test_partial_unpack("unpack 1c of remaining 7", 1, {p=packed,o=offset,remaining={"c"}})
+packed, offset = test_partial_unpack("unpack 1d of remaining 7", 1, {p=packed,o=offset,remaining={"d"}})
+packed, offset = test_partial_unpack("unpack 1e of remaining 7", 1, {p=packed,o=offset,remaining={"e"}})
+packed, offset = test_partial_unpack("unpack 1f of remaining 7", 1, {p=packed,o=offset,remaining={"f"}})
+packed, offset = test_partial_unpack("unpack 1g of remaining 7", 1, {p=packed,o=offset,remaining={"g"}})
+packed, offset = test_partial_unpack("unpack 1nil of remaining 7", 0, {p=packed,o=offset})
+
+packed, offset = test_partial_unpack("unpack 3 out of 7", 3, "a", "b", "c", "d", "e", "f", "g")
+test_partial_unpack("unpack remaining 4", 4, {p=packed,o=offset,remaining={"d", "e", "f", "g"}})
+
+test_unpack_one("simple", packed, "a")
+offset = test_unpack_one("simple", cmsgpack.pack({f = 3, j = 2}, "m", "e", 7), {f = 3, j = 2})
+test_unpack_one("simple", cmsgpack.pack({f = 3, j = 2}, "m", "e", 7), "m", offset)
 
 -- Final report
 print()
