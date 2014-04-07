@@ -89,23 +89,37 @@ static void memrevifle(void *ptr, size_t len) {
  * behavior.  */
 
 typedef struct mp_buf {
+    lua_State *L;
     unsigned char *b;
     size_t len, free;
 } mp_buf;
 
-static mp_buf *mp_buf_new(void) {
-    mp_buf *buf = (mp_buf*)malloc(sizeof(*buf));
+static void *mp_realloc(lua_State *L, void *target, size_t osize,size_t nsize) {
+    void *(*local_realloc) (void *, void *, size_t osize, size_t nsize) = NULL;
+    void *ud;
 
+    local_realloc = lua_getallocf(L, &ud);
+
+    return local_realloc(ud, target, osize, nsize);
+}
+
+static mp_buf *mp_buf_new(lua_State *L) {
+    mp_buf *buf = NULL;
+
+    /* Old size = 0; new size = sizeof(*buf) */
+    buf = (mp_buf*)mp_realloc(L, NULL, 0, sizeof(*buf));
+
+    buf->L = L;
     buf->b = NULL;
     buf->len = buf->free = 0;
     return buf;
 }
 
-void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
+static void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
     if (buf->free < len) {
         size_t newlen = buf->len+len;
 
-        buf->b = (unsigned char*)realloc(buf->b,newlen*2);
+        buf->b = (unsigned char*)mp_realloc(buf->L, buf->b, buf->len, newlen*2);
         buf->free = newlen;
     }
     memcpy(buf->b+buf->len,s,len);
@@ -114,8 +128,8 @@ void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
 }
 
 void mp_buf_free(mp_buf *buf) {
-    free(buf->b);
-    free(buf);
+    mp_realloc(buf->L, buf->b, buf->len, 0); /* realloc to 0 = free */
+    mp_realloc(buf->L, buf, sizeof(*buf), 0);
 }
 
 /* ---------------------------- String cursor ----------------------------------
@@ -493,7 +507,7 @@ static int mp_pack(lua_State *L) {
     if (nargs == 0)
         return luaL_argerror(L, 0, "MessagePack pack needs input.");
 
-    buf = mp_buf_new();
+    buf = mp_buf_new(L);
     for(i = 1; i <= nargs; i++) {
         /* Copy argument i to top of stack for _encode processing;
          * the encode function pops it from the stack when complete. */
