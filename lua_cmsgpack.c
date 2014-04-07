@@ -561,6 +561,16 @@ void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
  * a Lua type, that is left as the only result on the stack. */
 void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     mp_cur_need(c,1);
+
+    /* If we return more than 18 elements, we must resize the stack to
+     * fit all our return values.  But, there is no way to
+     * determine how many objects a msgpack will unpack to up front, so
+     * we request a +1 larger stack on each iteration (noop if stack is
+     * big enough, and when stack does require resize it doubles in size) */
+    luaL_checkstack(L, 1,
+        "too many return values at once; "
+        "use unpack_one or unpack_limit instead.");
+
     switch(c->p[0]) {
     case 0xcc:  /* uint 8 */
         mp_cur_need(c,2);

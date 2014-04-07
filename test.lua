@@ -369,6 +369,10 @@ pack = cmsgpack.pack(a)
 test_pack("regression for issue #4 output matching",a,"82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0", "82a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a178c0a17905a17905a17905a17905a17905a17905a17905a17905")
 test_circular("regression for issue #4 circular",a)
 
+-- test unpacking malformed input without crashing.  This actually returns one integer value (the ASCII code)
+-- for each character in the string.  We don't care about the return value, just that we don't segfault.
+cmsgpack.unpack("82a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17")
+
 -- Tests from github.com/moteus
 test_circular("map with number keys", {[1] = {1,2,3}})
 test_circular("map with float keys", {[1.5] = {1,2,3}})
