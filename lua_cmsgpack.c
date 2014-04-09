@@ -46,7 +46,7 @@ static void memrevifle(void *ptr, size_t len) {
     int test = 1;
     unsigned char *testp = (unsigned char*) &test;
 
-    if (testp[0] == 0) return; /* Big endian, nothign to do. */
+    if (testp[0] == 0) return; /* Big endian, nothing to do. */
     len /= 2;
     while(len--) {
         aux = *p;
@@ -58,7 +58,7 @@ static void memrevifle(void *ptr, size_t len) {
 }
 
 /* ----------------------------- String buffer ----------------------------------
- * This is a simple implementation of string buffers. The only opereation
+ * This is a simple implementation of string buffers. The only operation
  * supported is creating empty buffers and appending bytes to it.
  * The string buffer uses 2x preallocation on every realloc for O(N) append
  * behavior.  */
@@ -103,7 +103,7 @@ void mp_buf_free(mp_buf *buf) {
  * be used to report errors. */
 
 #define MP_CUR_ERROR_NONE   0
-#define MP_CUR_ERROR_EOF    1   /* Not enough data to complete the opereation. */
+#define MP_CUR_ERROR_EOF    1   /* Not enough data to complete the operation. */
 #define MP_CUR_ERROR_BADFMT 2   /* Bad data format */
 
 typedef struct mp_cur {
@@ -127,7 +127,7 @@ static void mp_cur_free(mp_cur *cursor) {
 
 #define mp_cur_consume(_c,_len) do { _c->p += _len; _c->left -= _len; } while(0)
 
-/* When there is not enough room we set an error in the cursor and return, this
+/* When there is not enough room we set an error in the cursor and return. This
  * is very common across the code so we have a macro to make the code look
  * a bit simpler. */
 #define mp_cur_need(_c,_len) do { \
@@ -350,7 +350,7 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
     /* First step: count keys into table. No other way to do it with the
      * Lua API, we need to iterate a first time. Note that an alternative
      * would be to do a single run, and then hack the buffer to insert the
-     * map opcodes for message pack. Too hachish for this lib. */
+     * map opcodes for message pack. Too hackish for this lib. */
     lua_pushnil(L);
     while(lua_next(L,-2)) {
         lua_pop(L,1); /* remove value, keep key for next iteration. */
@@ -417,7 +417,7 @@ static void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
 static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     int t = lua_type(L,-1);
 
-    /* Limit the encoding of nested tables to a specfiied maximum depth, so that
+    /* Limit the encoding of nested tables to a specified maximum depth, so that
      * we survive when called against circular references in tables. */
     if (t == LUA_TTABLE && level == LUACMSGPACK_MAX_NESTING) t = LUA_TNIL;
     switch(t) {
