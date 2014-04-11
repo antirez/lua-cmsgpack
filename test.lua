@@ -303,6 +303,19 @@ local function test_array()
         print("ok")
         passed = passed+1
     end
+
+    io.write("Testing array detection ...")
+
+    a = {["1"] = 20, [2] = 30, [3] = 40}
+    encode = cmsgpack.pack(a)
+    if etalon == encode then
+        print("ERROR:")
+        print("", " incorrect: ", hex(etalon))
+        failed = failed+1
+    else
+        print("ok")
+        passed = passed+1
+    end
 end
 
 test_global()
@@ -375,6 +388,8 @@ cmsgpack.unpack("82a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a
 
 -- Tests from github.com/moteus
 test_circular("map with number keys", {[1] = {1,2,3}})
+test_circular("map with string keys", {["1"] = {1,2,3}})
+test_circular("map with string keys", {["1"] = 20, [2] = 30, ["3"] = 40})
 test_circular("map with float keys", {[1.5] = {1,2,3}})
 test_error("unpack nil", function() cmsgpack.unpack(nil) end)
 test_error("unpack table", function() cmsgpack.unpack({}) end)
