@@ -431,7 +431,7 @@ static int table_is_an_array(lua_State *L) {
         lua_pop(L,1); /* Stack: ... key */
         /* The <= 0 check is valid here because we're comparing indexes. */
 #if LUA_VERSION_NUM < 503
-        if (!lua_isnumber(L,-1) || (n = lua_tonumber(L, -1)) <= 0 ||
+        if ((LUA_TNUMBER != lua_type(L,-1)) || (n = lua_tonumber(L, -1)) <= 0 ||
             !IS_INT_EQUIVALENT(n)) {
 #else
         if (!lua_isinteger(L,-1) || (n = lua_tointeger(L, -1)) <= 0) {
