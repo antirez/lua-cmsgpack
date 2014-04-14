@@ -6,6 +6,8 @@ local cmsgpack = require "cmsgpack"
 local ok, cmsgpack_safe = pcall(require, 'cmsgpack.safe')
 if not ok then cmsgpack_safe = nil end
 
+local unpack = unpack or table.unpack
+
 passed = 0
 failed = 0
 skipped = 0
