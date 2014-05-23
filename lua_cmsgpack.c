@@ -13,11 +13,9 @@
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
-#define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
-
 /* Allows a preprocessor directive to override MAX_NESTING */
 #ifndef LUACMSGPACK_MAX_NESTING
-    #define LUACMSGPACK_MAX_NESTING  16
+    #define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
 #endif
 
 #if (_XOPEN_SOURCE >= 600 || _ISOC99_SOURCE || _POSIX_C_SOURCE >= 200112L)
