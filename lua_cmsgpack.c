@@ -384,13 +384,15 @@ static int table_is_an_array(lua_State *L) {
         idx = n;
         if (idx != n || idx < 1) goto not_array;
         count++;
+        if ( max < idx )
+            max = idx;
     }
     /* We have the total number of elements in "count". Also we have
-     * the max index encountered in "idx". We can't reach this code
+     * the max index encountered in "max". We can't reach this code
      * if there are indexes <= 0. If you also note that there can not be
-     * repeated keys into a table, you have that if idx==count you are sure
+     * repeated keys into a table, you have that if max==count you are sure
      * that there are all the keys form 1 to count (both included). */
-    return idx == count;
+    return max == count;
 
 not_array:
     lua_pop(L,1);
