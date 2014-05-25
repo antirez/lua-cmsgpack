@@ -7,14 +7,14 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.0"
+#define LUACMSGPACK_VERSION     "lua-cmsgpack 0.3.1"
 #define LUACMSGPACK_COPYRIGHT   "Copyright (C) 2012, Salvatore Sanfilippo"
 #define LUACMSGPACK_DESCRIPTION "MessagePack C implementation for Lua"
 
 #define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
 
 /* ==============================================================================
- * MessagePack implementation and bindings for Lua 5.1.
+ * MessagePack implementation and bindings for Lua 5.1/5.2.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
  *
  * http://github.com/antirez/lua-cmsgpack
@@ -29,6 +29,7 @@
  * 20-Feb-2012 (ver 0.2.0): Tables encoding improved.
  * 20-Feb-2012 (ver 0.2.1): Minor bug fixing.
  * 20-Feb-2012 (ver 0.3.0): Module renamed lua-cmsgpack (was lua-msgpack).
+ * 04-Apr-2014 (ver 0.3.1): Lua 5.2 support and minor bug fix.
  * ============================================================================ */
 
 /* --------------------------- Endian conversion --------------------------------
@@ -328,7 +329,11 @@ static void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
 
 /* Convert a lua table into a message pack list. */
 static void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
+#if LUA_VERSION_NUM < 502
     size_t len = lua_objlen(L,-1), j;
+#else
+    size_t len = lua_rawlen(L,-1), j;
+#endif
 
     mp_encode_array(buf,len);
     for (j = 1; j <= len; j++) {
@@ -367,14 +372,14 @@ static void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
 static int table_is_an_array(lua_State *L) {
-    long count = 0, max = 0, idx = 0;
+    long count = 0, idx = 0;
     lua_Number n;
 
     lua_pushnil(L);
     while(lua_next(L,-2)) {
         /* Stack: ... key value */
         lua_pop(L,1); /* Stack: ... key */
-        if (!lua_isnumber(L,-1)) goto not_array;
+        if (lua_type(L,-1) != LUA_TNUMBER) goto not_array;
         n = lua_tonumber(L,-1);
         idx = n;
         if (idx != n || idx < 1) goto not_array;
@@ -681,21 +686,30 @@ static int mp_unpack(lua_State *L) {
         mp_cur_free(c);
         lua_pushstring(L,"Extra bytes in input.");
         lua_error(L);
+    } else {
+        mp_cur_free(c);
     }
-    mp_cur_free(c);
     return 1;
 }
 
 /* ---------------------------------------------------------------------------- */
 
+#if LUA_VERSION_NUM < 502
 static const struct luaL_reg thislib[] = {
+#else
+static const struct luaL_Reg thislib[] = {
+#endif
     {"pack", mp_pack},
     {"unpack", mp_unpack},
     {NULL, NULL}
 };
 
 LUALIB_API int luaopen_cmsgpack (lua_State *L) {
+#if LUA_VERSION_NUM < 502
     luaL_register(L, "cmsgpack", thislib);
+#else
+    luaL_newlib(L, thislib);
+#endif
 
     lua_pushliteral(L, LUACMSGPACK_VERSION);
     lua_setfield(L, -2, "_VERSION");
