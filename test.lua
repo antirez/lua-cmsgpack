@@ -6,6 +6,10 @@ local cmsgpack = require "cmsgpack"
 local ok, cmsgpack_safe = pcall(require, 'cmsgpack.safe')
 if not ok then cmsgpack_safe = nil end
 
+print("------------------------------------")
+print("Lua version: " .. (_G.jit and _G.jit.version or _G._VERSION))
+print("------------------------------------")
+
 local unpack = unpack or table.unpack
 
 passed = 0
@@ -350,6 +354,10 @@ test_circular("fix array (3)",{1,{},{}})
 test_circular("fix map",{a=5,b=10,c="string"})
 test_circular("positive infinity", math.huge)
 test_circular("negative infinity", -math.huge)
+test_circular("high bits", 0xFFFFFFFF)
+test_circular("higher bits", 0xFFFFFFFFFFFFFFFF)
+test_circular("high bits", -0x7FFFFFFF)
+test_circular("higher bits", -0x7FFFFFFFFFFFFFFF)
 
 -- The following test vectors are taken from the Javascript lib at:
 -- https://github.com/cuzic/MessagePack-JS/blob/master/test/test_pack.html
