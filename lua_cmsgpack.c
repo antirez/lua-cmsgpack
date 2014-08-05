@@ -254,7 +254,7 @@ static void mp_encode_int(mp_buf *buf, int64_t n) {
         }
     } else {
         if (n >= -32) {
-            b[0] = ((char)n);   /* negative fixnum */
+            b[0] = ((signed char)n);   /* negative fixnum */
             enclen = 1;
         } else if (n >= -128) {
             b[0] = 0xd0;        /* int 8 */
@@ -586,7 +586,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
         break;
     case 0xd0:  /* int 8 */
         mp_cur_need(c,2);
-        lua_pushinteger(L,(char)c->p[1]);
+        lua_pushinteger(L,(signed char)c->p[1]);
         mp_cur_consume(c,2);
         break;
     case 0xcd:  /* uint 16 */
