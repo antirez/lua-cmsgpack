@@ -1,6 +1,8 @@
 README for lua-cmsgpack.c
 ===
 
+[![Build Status](https://travis-ci.org/CheyiLin/lua-cmsgpack.svg?branch=mattsta-pull-requests)](https://travis-ci.org/CheyiLin/lua-cmsgpack)
+
 Lua-cmsgpack is a [MessagePack](http://msgpack.org) implementation and bindings for
 Lua 5.1/5.2/5.3 in a self contained C file without external dependencies.
 
