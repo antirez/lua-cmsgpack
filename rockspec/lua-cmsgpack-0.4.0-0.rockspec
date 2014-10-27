@@ -1,11 +1,11 @@
 package = "lua-cmsgpack"
-version = "scm-1"
+version = "0.4.0-0"
 source = {
    url = "git://github.com/antirez/lua-cmsgpack.git",
-   branch = "master"
+   tag = "0.4.0"
 }
 description = {
-   summary = "MessagePack C implementation and bindings for Lua 5.1",
+   summary = "MessagePack C implementation and bindings for Lua 5.1/5.2/5.3",
    homepage = "http://github.com/antirez/lua-cmsgpack",
    license = "Two-clause BSD",
    maintainer = "Salvatore Sanfilippo <antirez@gmail.com>"

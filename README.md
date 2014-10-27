@@ -2,7 +2,7 @@ README for lua-cmsgpack.c
 ===
 
 Lua-cmsgpack is a [MessagePack](http://msgpack.org) implementation and bindings for
-Lua 5.1/5.2 in a self contained C file without external dependencies.
+Lua 5.1/5.2/5.3 in a self contained C file without external dependencies.
 
 This library is open source software licensed under the BSD two-clause license.
 
@@ -33,10 +33,33 @@ interpreter:
 USAGE
 ---
 
-The exported API is very simple, consisting in two functions:
+The exported API is very simple, consisting of four functions:
 
-    msgpack = cmsgpack.pack(lua_object)
-    lua_object = cmsgpack.unpack(msgpack)
+Basic API:
+
+    msgpack = cmsgpack.pack(lua_object1, lua_object2, ..., lua_objectN)
+    lua_object1, lua_object2, ..., lua_objectN = cmsgpack.unpack(msgpack)
+
+Detailed API giving you more control over unpacking multiple values:
+
+    resume_offset, lua_object1 = cmsgpack.unpack_one(msgpack)
+    resume_offset1, lua_object2 = cmsgpack.unpack_one(msgpack, resume_offset)
+    ...
+    -1, lua_objectN = cmsgpack.unpack_one(msgpack, resume_offset_previous)
+
+    resume_offset, lua_object1, lua_object2 = cmsgpack.unpack_limit(msgpack, 2)
+    resume_offset2, lua_object3 = cmsgpack.unpack_limit(msgpack, 1, resume_offset1)
+
+Functions:
+
+  - `pack(arg1, arg2, ..., argn)` - pack any number of lua objects into one msgpack stream.  returns: msgpack
+  - `unpack(msgpack)` - unpack all objects in msgpack to individual return values. returns: object1, object2, ..., objectN
+  - `unpack_one(msgpack); unpack_one(msgpack, offset)` - unpacks the first object after offset. returns: offset, object
+  - `unpack_limit(msgpack, limit); unpack_limit(msgpack, limit, offset)` - unpacks the first `limit` objects and returns: offset, object1, objet2, ..., objectN (up to limit, but may return fewer than limit if not that many objects remain to be unpacked)
+
+When you reach the end of your input stream with `unpack_one` or `unpack_limit`, an offset of `-1` is returned.
+
+You may `require "msgpack"` or you may `require "msgpack.safe"`.  The safe version returns errors as (nil, errstring).
 
 However because of the nature of Lua numerical and table type a few behavior
 of the library must be well understood to avoid problems:
@@ -49,6 +72,16 @@ maps.
 * A Lua number is converted into an integer type if floor(number) == number, otherwise it is converted into the MessagePack float or double value.
 * When a Lua number is converted to float or double, the former is preferred if there is no loss of precision compared to the double representation.
 * When a MessagePack big integer (64 bit) is converted to a Lua number it is possible that the resulting number will not represent the original number but just an approximation. This is unavoidable because the Lua numerical type is usually a double precision floating point type.
+
+TESTING
+---
+
+Build and test:
+
+    mkdir build; cd build
+    cmake ..
+    make
+    lua ../test.lua
 
 NESTED TABLES
 ---
