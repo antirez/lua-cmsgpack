@@ -28,9 +28,17 @@ else()
     set(_lua_module_dir "${_lua_lib_dir}/lua/5.1")
 endif()
 
+option(Build32Bit "Build 32-bit Library" OFF)
+
 set(CMAKE_C_FLAGS "-O2 -g -ggdb -Wall -pedantic -std=c99")
 add_library(cmsgpack MODULE lua_cmsgpack.c)
 set_target_properties(cmsgpack PROPERTIES PREFIX "")
+
+if(Build32Bit)
+    set_target_properties(cmsgpack
+                          PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
+endif()
+
 target_link_libraries(cmsgpack ${_MODULE_LINK})
 install(TARGETS cmsgpack DESTINATION "${_lua_module_dir}")
 

@@ -83,6 +83,13 @@ Build and test:
     make
     lua ../test.lua
 
+You can build a 32-bit module on a 64-bit platform with:
+
+    mkdir build; cd build
+    cmake -DBuild32Bit=ON ..
+    make
+    lua ../test.lua
+
 NESTED TABLES
 ---
 Nested tables are handled correctly up to `LUACMSGPACK_MAX_NESTING` levels of
