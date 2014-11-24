@@ -3,7 +3,7 @@ language: erlang
 env:
   global:
     - PLATFORM=linux
-    - LUAROCKS_VER=2.1.0
+    - LUAROCKS_VER=2.2.0
   matrix:
     - LUA=lua5.1 LUA_SFX=
     - LUA=lua5.2 LUA_SFX=
@@ -11,7 +11,7 @@ env:
     - LUA=lua5.3 LUA_SFX=
 
 before_install:
-  - bash .travis/setup_lua.sh
+  - bash -x .travis/setup_lua.sh
   - sudo pip install cpp-coveralls
 
 install:
