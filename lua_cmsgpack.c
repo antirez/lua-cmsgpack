@@ -30,8 +30,19 @@
 #define IS_INT64_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int64_t)
 #define IS_INT_EQUIVALENT(x) IS_INT_TYPE_EQUIVALENT(x, int)
 
+/* If size of pointer is equal to a 4 byte integer, we're on 32 bits. */
+#if UINTPTR_MAX == UINT_MAX
+    #define BITS_32 1
+#else
+    #define BITS_32 0
+#endif
+
 #if LUA_VERSION_NUM < 503
-    #define lua_pushunsigned(L, n) lua_pushinteger(L, n)
+    #if BITS_32
+        #define lua_pushunsigned(L, n) lua_pushnumber(L, n)
+    #else
+        #define lua_pushunsigned(L, n) lua_pushinteger(L, n)
+    #endif
 #endif
 
 /* =============================================================================
@@ -348,7 +359,11 @@ static void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
 
 /* Lua 5.3 has a built in 64-bit integer type */
 static void mp_encode_lua_integer(lua_State *L, mp_buf *buf) {
+#if (LUA_VERSION_NUM < 503) && BITS_32
+    lua_Number i = lua_tonumber(L,-1);
+#else
     lua_Integer i = lua_tointeger(L,-1);
+#endif
     mp_encode_int(buf, (int64_t)i);
 }
 
@@ -431,10 +446,11 @@ static int table_is_an_array(lua_State *L) {
         /* The <= 0 check is valid here because we're comparing indexes. */
 #if LUA_VERSION_NUM < 503
         if ((LUA_TNUMBER != lua_type(L,-1)) || (n = lua_tonumber(L, -1)) <= 0 ||
-            !IS_INT_EQUIVALENT(n)) {
+            !IS_INT_EQUIVALENT(n))
 #else
-        if (!lua_isinteger(L,-1) || (n = lua_tointeger(L, -1)) <= 0) {
+        if (!lua_isinteger(L,-1) || (n = lua_tointeger(L, -1)) <= 0)
 #endif
+        {
             lua_settop(L, stacktop);
             return 0;
         }
@@ -628,7 +644,11 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
         break;
     case 0xd3:  /* int 64 */
         mp_cur_need(c,9);
+#if LUA_VERSION_NUM < 503
+        lua_pushnumber(L,
+#else
         lua_pushinteger(L,
+#endif
             ((int64_t)c->p[1] << 56) |
             ((int64_t)c->p[2] << 48) |
             ((int64_t)c->p[3] << 40) |
