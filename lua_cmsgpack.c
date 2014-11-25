@@ -37,12 +37,10 @@
     #define BITS_32 0
 #endif
 
-#if LUA_VERSION_NUM < 503
-    #if BITS_32
-        #define lua_pushunsigned(L, n) lua_pushnumber(L, n)
-    #else
-        #define lua_pushunsigned(L, n) lua_pushinteger(L, n)
-    #endif
+#if BITS_32
+    #define lua_pushunsigned(L, n) lua_pushnumber(L, n)
+#else
+    #define lua_pushunsigned(L, n) lua_pushinteger(L, n)
 #endif
 
 /* =============================================================================
@@ -836,15 +834,15 @@ static int mp_unpack(lua_State *L) {
 }
 
 static int mp_unpack_one(lua_State *L) {
-    int offset = luaL_optint(L, 2, 0);
+    int offset = luaL_optinteger(L, 2, 0);
     /* Variable pop because offset may not exist */
     lua_pop(L, lua_gettop(L)-1);
     return mp_unpack_full(L, 1, offset);
 }
 
 static int mp_unpack_limit(lua_State *L) {
-    int limit = luaL_checkint(L, 2);
-    int offset = luaL_optint(L, 3, 0);
+    int limit = luaL_checkinteger(L, 2);
+    int offset = luaL_optinteger(L, 3, 0);
     /* Variable pop because offset may not exist */
     lua_pop(L, lua_gettop(L)-1);
 
