@@ -18,6 +18,10 @@
     #define LUACMSGPACK_MAX_NESTING  16 /* Max tables nesting. */
 #endif
 
+#ifdef _MSC_VER
+    #define isinf(x) (!_finite(x))
+#endif
+
 /* Check if float or double can be an integer without loss of precision */
 #define IS_INT_TYPE_EQUIVALENT(x, T) (!isinf(x) && (T)(x) == (x))
 

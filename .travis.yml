@@ -1,24 +1,23 @@
-language: erlang
+language: ñ
 
 env:
   global:
-    - PLATFORM=linux
     - LUAROCKS_VER=2.2.0
   matrix:
-    - LUA=lua5.1 LUA_SFX=
-    - LUA=lua5.2 LUA_SFX=
-    - LUA=luajit LUA_SFX=jit
-    - LUA=lua5.3 LUA_SFX=
+    - LUA=lua5.1
+    - LUA=lua5.2
+    - LUA=lua5.3
+    - LUA=luajit
 
 before_install:
-  - bash -x .travis/setup_lua.sh
+  - bash .travis/setup_lua.sh
   - sudo pip install cpp-coveralls
 
 install:
   - sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec CFLAGS="-O2 -fPIC -ftest-coverage -fprofile-arcs" LIBFLAG="-shared --coverage"
 
 script:
-  - lua$LUA_SFX test.lua
+  - lua test.lua
 
 after_success:
   - coveralls
