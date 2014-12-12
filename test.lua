@@ -396,6 +396,12 @@ test_circular("regression for issue #4 circular",a)
 -- for each character in the string.  We don't care about the return value, just that we don't segfault.
 cmsgpack.unpack("82a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17882a17881a17")
 
+-- Test unpacking input which may cause overflow memory access ("-1" for 32-bit size fields).
+-- These should cause a Lua error but not a segfault.
+test_error("unpack big string with missing input", function() cmsgpack.unpack("\219\255\255\255\255Z") end)
+test_error("unpack big array with missing input", function() cmsgpack.unpack("\221\255\255\255\255Z") end)
+test_error("unpack big map with missing input", function() cmsgpack.unpack("\223\255\255\255\255Z") end)
+
 -- Tests from github.com/moteus
 test_circular("map with number keys", {[1] = {1,2,3}})
 test_circular("map with string keys", {["1"] = {1,2,3}})

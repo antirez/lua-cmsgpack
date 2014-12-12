@@ -542,6 +542,7 @@ static int mp_pack(lua_State *L) {
 void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
 
 void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
+    assert(len <= UINT_MAX);
     int index = 1;
 
     lua_newtable(L);
@@ -554,6 +555,7 @@ void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
 }
 
 void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
+    assert(len <= UINT_MAX);
     lua_newtable(L);
     while(len--) {
         mp_decode_to_lua_type(L,c); /* key */
@@ -697,13 +699,14 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     case 0xdb:  /* raw 32 */
         mp_cur_need(c,5);
         {
-            size_t l = (c->p[1] << 24) |
-                       (c->p[2] << 16) |
-                       (c->p[3] << 8) |
-                       c->p[4];
-            mp_cur_need(c,5+l);
-            lua_pushlstring(L,(char*)c->p+5,l);
-            mp_cur_consume(c,5+l);
+            size_t l = ((size_t)c->p[1] << 24) |
+                       ((size_t)c->p[2] << 16) |
+                       ((size_t)c->p[3] << 8) |
+                       (size_t)c->p[4];
+            mp_cur_consume(c,5);
+            mp_cur_need(c,l);
+            lua_pushlstring(L,(char*)c->p,l);
+            mp_cur_consume(c,l);
         }
         break;
     case 0xdc:  /* array 16 */
@@ -717,10 +720,10 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     case 0xdd:  /* array 32 */
         mp_cur_need(c,5);
         {
-            size_t l = (c->p[1] << 24) |
-                       (c->p[2] << 16) |
-                       (c->p[3] << 8) |
-                       c->p[4];
+            size_t l = ((size_t)c->p[1] << 24) |
+                       ((size_t)c->p[2] << 16) |
+                       ((size_t)c->p[3] << 8) |
+                       (size_t)c->p[4];
             mp_cur_consume(c,5);
             mp_decode_to_lua_array(L,c,l);
         }
@@ -736,10 +739,10 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     case 0xdf:  /* map 32 */
         mp_cur_need(c,5);
         {
-            size_t l = (c->p[1] << 24) |
-                       (c->p[2] << 16) |
-                       (c->p[3] << 8) |
-                       c->p[4];
+            size_t l = ((size_t)c->p[1] << 24) |
+                       ((size_t)c->p[2] << 16) |
+                       ((size_t)c->p[3] << 8) |
+                       (size_t)c->p[4];
             mp_cur_consume(c,5);
             mp_decode_to_lua_hash(L,c,l);
         }
