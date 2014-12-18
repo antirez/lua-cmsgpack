@@ -5,19 +5,26 @@ env:
     - PLATFORM=linux
     - LUAROCKS_VER=2.2.0
   matrix:
-    - LUA=lua5.1 LUA_SFX=
-    - LUA=lua5.2 LUA_SFX=
-    - LUA=luajit LUA_SFX=jit
-    - LUA=lua5.3 LUA_SFX=
+    - LUA=lua5.1 LUA_SFX= BUILD=-m32
+    - LUA=lua5.1 LUA_SFX= BUILD=-m64
+    - LUA=lua5.2 LUA_SFX= BUILD=-m32
+    - LUA=lua5.2 LUA_SFX= BUILD=-m64
+    - LUA=luajit LUA_SFX=jit BUILD=-m32
+    - LUA=luajit LUA_SFX=jit BUILD=-m64
+    - LUA=lua5.3 LUA_SFX= BUILD=-m32
+    - LUA=lua5.3 LUA_SFX= BUILD=-m64
 
 before_install:
+  - sudo apt-get update
+  - sudo apt-get install gcc-multilib libreadline-dev:i386 # for 32 bit builds
   - bash -x .travis/setup_lua.sh
   - sudo pip install cpp-coveralls
 
 install:
-  - sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec CFLAGS="-O2 -fPIC -ftest-coverage -fprofile-arcs" LIBFLAG="-shared --coverage"
+  - sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec CFLAGS="$BUILD -O2 -fPIC -ftest-coverage -fprofile-arcs" LIBFLAG="$BUILD -shared --coverage"
 
 script:
+  - echo $(file $(which lua$LUA_SFX))
   - lua$LUA_SFX test.lua
 
 after_success:
