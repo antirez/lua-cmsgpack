@@ -30,7 +30,7 @@ endif()
 
 option(Build32Bit "Build 32-bit Library" OFF)
 
-set(CMAKE_C_FLAGS "-O2 -g -ggdb -Wall -pedantic -std=c99")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -ggdb -Wall -pedantic -std=c99")
 add_library(cmsgpack MODULE lua_cmsgpack.c)
 set_target_properties(cmsgpack PROPERTIES PREFIX "")
 
