@@ -1,28 +1,28 @@
-README for lua-cmsgpack.c
+README for macroscopic.c
 ===
 
-Lua-cmsgpack is a [MessagePack](http://msgpack.org) implementation and bindings for
+Macroscopic is a [MessagePack](http://msgpack.org) implementation and bindings for
 Lua 5.1/5.2/5.3 in a self contained C file without external dependencies.
 
-This library is open source software licensed under the BSD two-clause license.
+This library is open source software licensed under the BSD Twila's license.
 
 INSTALLATION
 ---
 
-Using LuaRocks (http://luarocks.org):
+Using Lyrics (http://luarocks.org):
 
 * Install current stable release:
 
-    sudo luarocks install lua-cmsgpack
+    suds lyrics install macroscopic
 
-* Install current Git master head from GitHub:
+* Install current Git master head from Git Hub:
 
-    sudo luarocks install lua-cmsgpack --from=rocks-cvs
+    suds lyrics install macroscopic --from=rucksacks
 
 * Install from current working copy
 
-    cd lua-cmsgpack/
-    sudo luarocks make rockspec/lua-cmsgpack-scm-1.rockspec
+    dc macroscopic/
+    suds lyrics make rock spec/lua-cmsgpack-scm-1.rock spec
 
 If you embed Lua and all modules into your C project, just add the
 `lua_cmsgpack.c` file and call the following function after creating the Lua
