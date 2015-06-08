@@ -37,6 +37,10 @@
     #define lua_pushunsigned(L, n) lua_pushinteger(L, n)
 #endif
 
+#ifndef REDIS_STATIC
+    #define REDIS_STATIC static
+#endif
+
 /* =============================================================================
  * MessagePack implementation and bindings for Lua 5.1/5.2.
  * Copyright(C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
@@ -66,7 +70,7 @@
 /* Reverse memory bytes if arch is little endian. Given the conceptual
  * simplicity of the Lua build system we prefer check for endianess at runtime.
  * The performance difference should be acceptable. */
-void memrevifle(void *ptr, size_t len) {
+REDIS_STATIC void memrevifle(void *ptr, size_t len) {
     unsigned char   *p = (unsigned char *)ptr,
                     *e = (unsigned char *)p+len-1,
                     aux;
@@ -96,7 +100,8 @@ typedef struct mp_buf {
     size_t len, free;
 } mp_buf;
 
-void *mp_realloc(lua_State *L, void *target, size_t osize,size_t nsize) {
+REDIS_STATIC void *mp_realloc(lua_State *L, void *target,
+                              size_t osize, size_t nsize) {
     void *(*local_realloc) (void *, void *, size_t osize, size_t nsize) = NULL;
     void *ud;
 
@@ -105,7 +110,7 @@ void *mp_realloc(lua_State *L, void *target, size_t osize,size_t nsize) {
     return local_realloc(ud, target, osize, nsize);
 }
 
-mp_buf *mp_buf_new(lua_State *L) {
+REDIS_STATIC mp_buf *mp_buf_new(lua_State *L) {
     mp_buf *buf = NULL;
 
     /* Old size = 0; new size = sizeof(*buf) */
@@ -117,7 +122,8 @@ mp_buf *mp_buf_new(lua_State *L) {
     return buf;
 }
 
-void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
+REDIS_STATIC void mp_buf_append(mp_buf *buf, const unsigned char *s,
+                                size_t len) {
     if (buf->free < len) {
         size_t newlen = buf->len+len;
 
@@ -129,7 +135,7 @@ void mp_buf_append(mp_buf *buf, const unsigned char *s, size_t len) {
     buf->free -= len;
 }
 
-void mp_buf_free(mp_buf *buf) {
+REDIS_STATIC void mp_buf_free(mp_buf *buf) {
     mp_realloc(buf->L, buf->b, buf->len, 0); /* realloc to 0 = free */
     mp_realloc(buf->L, buf, sizeof(*buf), 0);
 }
@@ -153,7 +159,8 @@ typedef struct mp_cur {
     int err;
 } mp_cur;
 
-void mp_cur_init(mp_cur *cursor, const unsigned char *s, size_t len) {
+REDIS_STATIC void mp_cur_init(mp_cur *cursor, const unsigned char *s,
+                              size_t len) {
     cursor->p = s;
     cursor->left = len;
     cursor->err = MP_CUR_ERROR_NONE;
@@ -173,7 +180,8 @@ void mp_cur_init(mp_cur *cursor, const unsigned char *s, size_t len) {
 
 /* ------------------------- Low level MP encoding -------------------------- */
 
-void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
+REDIS_STATIC void mp_encode_bytes(mp_buf *buf, const unsigned char *s,
+                                  size_t len) {
     unsigned char hdr[5];
     int hdrlen;
 
@@ -202,7 +210,7 @@ void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
 }
 
 /* we assume IEEE 754 internal format for single and double precision floats. */
-void mp_encode_double(mp_buf *buf, double d) {
+REDIS_STATIC void mp_encode_double(mp_buf *buf, double d) {
     unsigned char b[9];
     float f = d;
 
@@ -220,7 +228,7 @@ void mp_encode_double(mp_buf *buf, double d) {
     }
 }
 
-void mp_encode_int(mp_buf *buf, int64_t n) {
+REDIS_STATIC void mp_encode_int(mp_buf *buf, int64_t n) {
     unsigned char b[9];
     int enclen;
 
@@ -292,7 +300,7 @@ void mp_encode_int(mp_buf *buf, int64_t n) {
     mp_buf_append(buf,b,enclen);
 }
 
-void mp_encode_array(mp_buf *buf, int64_t n) {
+REDIS_STATIC void mp_encode_array(mp_buf *buf, int64_t n) {
     unsigned char b[5];
     int enclen;
 
@@ -315,7 +323,7 @@ void mp_encode_array(mp_buf *buf, int64_t n) {
     mp_buf_append(buf,b,enclen);
 }
 
-void mp_encode_map(mp_buf *buf, int64_t n) {
+REDIS_STATIC void mp_encode_map(mp_buf *buf, int64_t n) {
     unsigned char b[5];
     int enclen;
 
@@ -340,7 +348,7 @@ void mp_encode_map(mp_buf *buf, int64_t n) {
 
 /* --------------------------- Lua types encoding --------------------------- */
 
-void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
+REDIS_STATIC void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
     size_t len;
     const char *s;
 
@@ -348,13 +356,13 @@ void mp_encode_lua_string(lua_State *L, mp_buf *buf) {
     mp_encode_bytes(buf,(const unsigned char*)s,len);
 }
 
-void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
+REDIS_STATIC void mp_encode_lua_bool(lua_State *L, mp_buf *buf) {
     unsigned char b = lua_toboolean(L,-1) ? 0xc3 : 0xc2;
     mp_buf_append(buf,&b,1);
 }
 
 /* Lua 5.3 has a built in 64-bit integer type */
-void mp_encode_lua_integer(lua_State *L, mp_buf *buf) {
+REDIS_STATIC void mp_encode_lua_integer(lua_State *L, mp_buf *buf) {
 #if (LUA_VERSION_NUM < 503) && BITS_32
     lua_Number i = lua_tonumber(L,-1);
 #else
@@ -366,7 +374,7 @@ void mp_encode_lua_integer(lua_State *L, mp_buf *buf) {
 /* Lua 5.2 and lower only has 64-bit doubles, so we need to
  * detect if the double may be representable as an int
  * for Lua < 5.3 */
-void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
+REDIS_STATIC void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     lua_Number n = lua_tonumber(L,-1);
 
     if (IS_INT64_EQUIVALENT(n)) {
@@ -376,10 +384,10 @@ void mp_encode_lua_number(lua_State *L, mp_buf *buf) {
     }
 }
 
-void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
+REDIS_STATIC void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level);
 
 /* Convert a lua table into a message pack list. */
-void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
+REDIS_STATIC void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
 #if LUA_VERSION_NUM < 502
     size_t len = lua_objlen(L,-1), j;
 #else
@@ -395,7 +403,7 @@ void mp_encode_lua_table_as_array(lua_State *L, mp_buf *buf, int level) {
 }
 
 /* Convert a lua table into a message pack key-value map. */
-void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
+REDIS_STATIC void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
     size_t len = 0;
 
     /* First step: count keys into table. No other way to do it with the
@@ -422,7 +430,7 @@ void mp_encode_lua_table_as_map(lua_State *L, mp_buf *buf, int level) {
 /* Returns true if the Lua table on top of the stack is exclusively composed
  * of keys from numerical keys from 1 up to N, with N being the total number
  * of elements, without any hole in the middle. */
-int table_is_an_array(lua_State *L) {
+REDIS_STATIC int table_is_an_array(lua_State *L) {
     int count = 0, max = 0;
 #if LUA_VERSION_NUM < 503
     lua_Number n;
@@ -465,14 +473,14 @@ int table_is_an_array(lua_State *L) {
 /* If the length operator returns non-zero, that is, there is at least
  * an object at key '1', we serialize to message pack list. Otherwise
  * we use a map. */
-void mp_encode_lua_table(lua_State *L, mp_buf *buf, int level) {
+REDIS_STATIC void mp_encode_lua_table(lua_State *L, mp_buf *buf, int level) {
     if (table_is_an_array(L))
         mp_encode_lua_table_as_array(L,buf,level);
     else
         mp_encode_lua_table_as_map(L,buf,level);
 }
 
-void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
+REDIS_STATIC void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
     unsigned char b[1];
     (void)L;
 
@@ -480,7 +488,7 @@ void mp_encode_lua_null(lua_State *L, mp_buf *buf) {
     mp_buf_append(buf,b,1);
 }
 
-void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
+REDIS_STATIC void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
     int t = lua_type(L,-1);
 
     /* Limit the encoding of nested tables to a specified maximum depth, so that
@@ -510,7 +518,7 @@ void mp_encode_lua_type(lua_State *L, mp_buf *buf, int level) {
  * Packs all arguments as a stream for multiple upacking later.
  * Returns error if no arguments provided.
  */
-int mp_pack(lua_State *L) {
+REDIS_STATIC int mp_pack(lua_State *L) {
     int nargs = lua_gettop(L);
     int i;
     mp_buf *buf;
@@ -543,9 +551,9 @@ int mp_pack(lua_State *L) {
 
 /* ------------------------------- Decoding --------------------------------- */
 
-void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
+REDIS_STATIC void mp_decode_to_lua_type(lua_State *L, mp_cur *c);
 
-void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
+REDIS_STATIC void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
     assert(len <= UINT_MAX);
     int index = 1;
 
@@ -558,7 +566,7 @@ void mp_decode_to_lua_array(lua_State *L, mp_cur *c, size_t len) {
     }
 }
 
-void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
+REDIS_STATIC void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
     assert(len <= UINT_MAX);
     lua_newtable(L);
     while(len--) {
@@ -572,7 +580,7 @@ void mp_decode_to_lua_hash(lua_State *L, mp_cur *c, size_t len) {
 
 /* Decode a Message Pack raw object pointed by the string cursor 'c' to
  * a Lua type, that is left as the only result on the stack. */
-void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
+REDIS_STATIC void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     mp_cur_need(c,1);
 
     /* If we return more than 18 elements, we must resize the stack to
@@ -786,7 +794,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     }
 }
 
-int mp_unpack_full(lua_State *L, int limit, int offset) {
+REDIS_STATIC int mp_unpack_full(lua_State *L, int limit, int offset) {
     size_t len;
     const char *s;
     mp_cur c;
@@ -839,18 +847,18 @@ int mp_unpack_full(lua_State *L, int limit, int offset) {
     return cnt;
 }
 
-int mp_unpack(lua_State *L) {
+REDIS_STATIC int mp_unpack(lua_State *L) {
     return mp_unpack_full(L, 0, 0);
 }
 
-int mp_unpack_one(lua_State *L) {
+REDIS_STATIC int mp_unpack_one(lua_State *L) {
     int offset = luaL_optinteger(L, 2, 0);
     /* Variable pop because offset may not exist */
     lua_pop(L, lua_gettop(L)-1);
     return mp_unpack_full(L, 1, offset);
 }
 
-int mp_unpack_limit(lua_State *L) {
+REDIS_STATIC int mp_unpack_limit(lua_State *L) {
     int limit = luaL_checkinteger(L, 2);
     int offset = luaL_optinteger(L, 3, 0);
     /* Variable pop because offset may not exist */
@@ -859,7 +867,7 @@ int mp_unpack_limit(lua_State *L) {
     return mp_unpack_full(L, limit, offset);
 }
 
-int mp_safe(lua_State *L) {
+REDIS_STATIC int mp_safe(lua_State *L) {
     int argc, err, total_results;
 
     argc = lua_gettop(L);
@@ -882,7 +890,7 @@ int mp_safe(lua_State *L) {
 }
 
 /* -------------------------------------------------------------------------- */
-const struct luaL_Reg cmds[] = {
+static const struct luaL_Reg cmds[] = {
     {"pack", mp_pack},
     {"unpack", mp_unpack},
     {"unpack_one", mp_unpack_one},
@@ -890,7 +898,7 @@ const struct luaL_Reg cmds[] = {
     {0}
 };
 
-int luaopen_create(lua_State *L) {
+REDIS_STATIC int luaopen_create(lua_State *L) {
     int i;
     /* Manually construct our module table instead of
      * relying on _register or _newlib */

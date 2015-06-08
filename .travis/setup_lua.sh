@@ -40,7 +40,7 @@ if [ "$LUAJIT" == "yes" ]; then
     git checkout v2.1;
   fi
 
-  make && sudo make install
+  make HOST_CC="gcc $BUILD" CC="gcc $BUILD" && sudo make install
 
   if [ "$LUA" == "luajit2.1" ]; then
     sudo ln -s /usr/local/bin/luajit-2.1.0-alpha /usr/local/bin/luajit
@@ -60,7 +60,12 @@ else
     curl http://www.lua.org/work/lua-5.3.0-beta.tar.gz | tar xz
     cd lua-5.3.0-beta;
   fi
-  sudo make $PLATFORM install;
+  if [[ "$PLATFORM" == "linux" ]]; then
+      (cd src && make all MYCFLAGS="$BUILD -DLUA_USE_LINUX" MYLDFLAGS="$BUILD" MYLIBS="-Wl,-E -ldl -lreadline")
+  elif [[ "$PLATFORM" == "macosx" ]]; then
+      (cd src && make all MYCFLAGS="$BUILD -DLUA_USE_MACOSX" MYLDFLAGS="$BUILD" MYLIBS="-lreadline" CC=cc)
+  fi
+  sudo make install
 fi
 
 cd $TRAVIS_BUILD_DIR;
