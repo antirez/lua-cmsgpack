@@ -180,6 +180,10 @@ void mp_encode_bytes(mp_buf *buf, const unsigned char *s, size_t len) {
     if (len < 32) {
         hdr[0] = 0xa0 | (len&0xff); /* fix raw */
         hdrlen = 1;
+    } else if (len <= 0xff) {
+        hdr[0] = 0xd9;
+        hdr[1] = len;
+        hdrlen = 2;
     } else if (len <= 0xffff) {
         hdr[0] = 0xda;
         hdr[1] = (len&0xff00)>>8;
@@ -685,6 +689,15 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
             memrevifle(&d,8);
             lua_pushnumber(L,d);
             mp_cur_consume(c,9);
+        }
+        break;
+    case 0xd9:  /* raw 8 */
+        mp_cur_need(c,2);
+        {
+            size_t l = c->p[1];
+            mp_cur_need(c,2+l);
+            lua_pushlstring(L,(char*)c->p+2,l);
+            mp_cur_consume(c,2+l);
         }
         break;
     case 0xda:  /* raw 16 */
