@@ -688,6 +688,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
             mp_cur_consume(c,9);
         }
         break;
+    case 0xc4:  /* bin 8 */
     case 0xd9:  /* raw 8 */
         mp_cur_need(c,2);
         {
@@ -697,6 +698,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
             mp_cur_consume(c,2+l);
         }
         break;
+    case 0xc5:  /* bin 16 */
     case 0xda:  /* raw 16 */
         mp_cur_need(c,3);
         {
@@ -706,6 +708,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
             mp_cur_consume(c,3+l);
         }
         break;
+    case 0xc6:  /* bin 32 */
     case 0xdb:  /* raw 32 */
         mp_cur_need(c,5);
         {
