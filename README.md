@@ -113,3 +113,8 @@ CREDITS
 This library was written by Salvatore Sanfilippo for Redis, but is maintained as a separated project by the author.
 
 Some of the test vectors in "test.lua" are obtained from the Javascript [MessagePack-JS library](https://github.com/cuzic/MessagePack-JS).
+
+LICENSE
+---
+The library is published under the MIT License. See separate LICENSE file.
+
