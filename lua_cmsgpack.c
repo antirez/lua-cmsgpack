@@ -769,7 +769,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
             mp_cur_need(c,1+l);
             lua_pushlstring(L,(char*)c->p+1,l);
             mp_cur_consume(c,1+l);
-        } else if ((c->p[0] & 0xf0) == 0x90) {  /* fix map */
+        } else if ((c->p[0] & 0xf0) == 0x90) {  /* fix array */
             size_t l = c->p[0] & 0xf;
             mp_cur_consume(c,1);
             mp_decode_to_lua_array(L,c,l);
