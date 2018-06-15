@@ -5,10 +5,11 @@ env:
     - PLATFORM=linux
     - LUAROCKS_VER=2.2.0
   matrix:
-    - LUA=lua5.1 LUA_SFX=
-    - LUA=lua5.2 LUA_SFX=
-    - LUA=luajit LUA_SFX=jit
-    - LUA=lua5.3 LUA_SFX=
+    - LUA=lua5.1    LUA_SFX=
+    - LUA=lua5.2    LUA_SFX=
+    - LUA=lua5.3    LUA_SFX=
+    - LUA=luajit    LUA_SFX=jit
+    - LUA=luajit2.1 LUA_SFX=jit
 
 before_install:
   - bash -x .travis/setup_lua.sh
