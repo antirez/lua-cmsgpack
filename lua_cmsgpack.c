@@ -144,6 +144,7 @@ void mp_buf_free(lua_State *L, mp_buf *buf) {
 #define MP_CUR_ERROR_NONE   0
 #define MP_CUR_ERROR_EOF    1   /* Not enough data to complete operation. */
 #define MP_CUR_ERROR_BADFMT 2   /* Bad data format */
+#define MP_CUR_ERROR_EXTRA  3   /* Extra bytes */
 
 typedef struct mp_cur {
     const unsigned char *p;
@@ -820,6 +821,8 @@ int mp_unpack_full(lua_State *L, int limit, int offset) {
             return luaL_error(L,"Missing bytes in input.");
         } else if (c.err == MP_CUR_ERROR_BADFMT) {
             return luaL_error(L,"Bad data format in input.");
+        } else if (c.err == MP_CUR_ERROR_EXTRA || c.left > 0) {
+            return luaL_error(L,"Extra Bytes.");
         }
     }
 
