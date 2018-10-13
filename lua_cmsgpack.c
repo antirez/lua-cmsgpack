@@ -790,7 +790,7 @@ void mp_decode_to_lua_type(lua_State *L, mp_cur *c) {
     }
 }
 
-int mp_unpack_full(lua_State *L, int limit, int offset) {
+int mp_unpack_full(lua_State *L, int limit, size_t offset) {
     size_t len;
     const char *s;
     mp_cur c;
@@ -898,7 +898,7 @@ const struct luaL_Reg cmds[] = {
 };
 
 int luaopen_create(lua_State *L) {
-    int i;
+    unsigned i;
     /* Manually construct our module table instead of
      * relying on _register or _newlib */
     lua_newtable(L);
@@ -933,7 +933,7 @@ LUALIB_API int luaopen_cmsgpack(lua_State *L) {
 }
 
 LUALIB_API int luaopen_cmsgpack_safe(lua_State *L) {
-    int i;
+    unsigned i;
 
     luaopen_cmsgpack(L);
 
