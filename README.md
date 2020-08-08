@@ -17,7 +17,7 @@ Using LuaRocks (http://luarocks.org):
 
 * Install current Git master head from GitHub:
 
-    sudo luarocks install lua-cmsgpack --from=rocks-cvs
+    sudo luarocks install lua-cmsgpack scm-1 --server=https://luarocks.org/dev
 
 * Install from current working copy
 
