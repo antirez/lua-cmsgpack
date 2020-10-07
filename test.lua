@@ -9,13 +9,8 @@ if not ok then cmsgpack_safe = nil end
 print("------------------------------------")
 print("Lua version: " .. (_G.jit and _G.jit.version or _G._VERSION))
 print("------------------------------------")
-
 local unpack = unpack or table.unpack
-
-passed = 0
-failed = 0
-skipped = 0
-
+passed = failed = skipped = 0
 function hex(s)
     local i
     local h = ""
@@ -55,10 +50,10 @@ function test_error(name, fn)
     -- 'ok' is an error because we are testing for expicit *failure*
     if ok then
         print("ERROR: result ", ret, err)
-        failed = failed+1
+        failed += 1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 end
 
@@ -66,10 +61,10 @@ local function test_multiple(name, ...)
     io.write("Multiple test '",name,"' ...")
     if not compare_objects({...},{cmsgpack.unpack(cmsgpack.pack(...))}) then
         print("ERROR:", {...}, cmsgpack.unpack(cmsgpack.pack(...)))
-        failed = failed+1
+        failed += 1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 end
 
@@ -77,13 +72,13 @@ function test_noerror(name, fn)
     io.write("Testing safe calling '",name,"' ...")
     if not cmsgpack_safe then
         print("skip: no `cmsgpack.safe` module")
-        skipped = skipped + 1
+        skipped += 1
         return
     end
     local ok, ret, err = pcall(fn)
     if not ok then
         print("ERROR: result ", ret, err)
-        failed = failed+1
+        failed += 1
     else
         print("ok")
         passed = passed+1
@@ -100,7 +95,7 @@ function compare_objects(a,b,depth)
         end
         for k,v in pairs(a) do
             if not compare_objects(b[k],v, depth + 1) then return false end
-            count = count + 1
+            count += 1
         end
         -- All the 'a' keys are equal to their 'b' equivalents.
         -- Now we can check if there are extra fields in 'b'.
@@ -112,13 +107,13 @@ function compare_objects(a,b,depth)
 end
 
 function test_circular(name,obj)
-    io.write("Circular test '",name,"' ...")
+    io.write("Circular test :'",name,"' ...")
     if not compare_objects(obj,cmsgpack.unpack(cmsgpack.pack(obj))) then
         print("ERROR:", obj, cmsgpack.unpack(cmsgpack.pack(obj)))
-        failed = failed+1
+        failed += 1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 end
 
@@ -141,20 +136,20 @@ function test_stream(mod, name, ...)
                 local fail = not compare_objects(v, ret[i][k])
                 if fail then
                     print("ERRORa:", k, v, " not match ", ret[i][k])
-                    failed = failed + 1
+                    failed += 1
                 elseif not fail then
                     print("ok; matched stream table member")
-                    passed = passed + 1
+                    passed += 1
                 end
             end
         else
             local fail = not compare_objects(origin, ret[i])
             if fail then
                 print("ERRORc:", origin, " not match ", ret[i])
-                failed = failed + 1
+                failed += 1
             elseif not fail then
                 print("ok; matched individual stream member")
-                passed = passed + 1
+                   passed += 1
             end
         end
     end
@@ -179,7 +174,7 @@ function test_partial_unpack(name, count, ...)
         ok, unpacked, err = pcall(function()return {cmsgpack.unpack_limit(unpack(cargs))} end)
         if not ok then
             print("ok; received error as expected") --, unpacked)
-            passed = passed + 1
+            passed += 1
             return
         end
     else
@@ -189,14 +184,14 @@ function test_partial_unpack(name, count, ...)
 
     if count == 0 and #unpacked == 1 then
         print("ok; received zero decodes as expected")
-        passed = passed + 1
+        passed  += 1
         return
     end
 
     if not (((#unpacked)-1) == count) then
         print(string.format("ERROR: received %d instead of %d objects:", (#unpacked)-1, count),
             unpack(select(1, unpacked)))
-        failed = failed + 1
+        failed += 1
         return
     end
 
@@ -205,10 +200,10 @@ function test_partial_unpack(name, count, ...)
         --print("Comparing ", origin, unpacked[i])
         if not compare_objects(origin, unpacked[i]) then
             print("ERROR:", origin, " not match ", unpacked[i])
-            failed = failed + 1
+            failed += 1
         else
             print("ok; matched unpacked value to input")
-            passed = passed + 1
+            passed += 1
         end
     end
 
@@ -221,13 +216,13 @@ function test_pack(name,obj,raw,optraw)
     local result = hex(cmsgpack.pack(obj))
     if optraw and (result == optraw) then
         print("ok")
-        passed = passed + 1
+        passed += 1
     elseif result ~= raw then
         print("ERROR:", obj, hex(cmsgpack.pack(obj)), raw)
-        failed = failed+1
+        failed +=1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 end
 
@@ -240,10 +235,10 @@ function test_unpack_one(name, packed, check, offset)
         failed = failed + 1
     elseif not compare_objects(unpacked[2], check) then
         print("ERROR: unpacked unexpected result:", unpack(unpacked))
-        failed = failed + 1
+        failed +=  1
     else
         print("ok") --; unpacked", unpacked[2])
-        passed = passed + 1
+        passed +=  1
     end
 
     return unpacked[1]
@@ -253,10 +248,10 @@ function test_unpack(name,raw,obj)
     io.write("Testing decoder '",name,"' ...")
     if not compare_objects(cmsgpack.unpack(unhex(raw)),obj) then
         print("ERROR:", obj, raw, cmsgpack.unpack(unhex(raw)))
-        failed = failed+1
+        failed += 1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 end
 
@@ -271,18 +266,18 @@ local function test_global()
     if _VERSION == "Lua 5.1" then
         if not _G.cmsgpack then
             print("ERROR: Lua 5.1 should set global")
-            failed = failed+1
+            failed += 1
         else
             print("ok")
-            passed = passed+1
+            passed += 1
         end
     else
         if _G.cmsgpack then
             print("ERROR: Lua 5.2 should not set global")
-            failed = failed+1
+            failed += failed+1
         else
             print("ok")
-            passed = passed+1
+            passed += 1
         end
     end
 end
@@ -304,10 +299,10 @@ local function test_array()
         print("ERROR:")
         print("", "expected: ", hex(etalon))
         print("", "     got: ", hex(encode))
-        failed = failed+1
+        failed +=1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 
     io.write("Testing array detection ...")
@@ -317,10 +312,10 @@ local function test_array()
     if etalon == encode then
         print("ERROR:")
         print("", " incorrect: ", hex(etalon))
-        failed = failed+1
+        failed += 1
     else
         print("ok")
-        passed = passed+1
+        passed += 1
     end
 end
 
